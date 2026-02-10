@@ -18,12 +18,13 @@ export default function Logs() {
   const [logs, setLogs] = useState<string[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [streaming, setStreaming] = useState(false);
+  // 从 localStorage 初始化 streaming 状态，避免切换页面时状态不一致
+  const [streaming, setStreaming] = useState(() => localStorage.getItem("logStreaming") === "true");
   const [searchQuery, setSearchQuery] = useState("");
   const [useRegex, setUseRegex] = useState(false);
   const [regexError, setRegexError] = useState<string | null>(null);
   const [logLevel, setLogLevel] = useState<"all" | "info" | "warn" | "error">("all");
-  const [showStatistics, setShowStatistics] = useState(true);
+  const [showStatistics, setShowStatistics] = useState(false);
   const [statistics, setStatistics] = useState<LogStatistics>({
     total: 0,
     info: 0,
@@ -315,60 +316,7 @@ export default function Logs() {
     <div className="flex-1 overflow-hidden flex flex-col">
       {/* 头部 */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold text-gray-900">日志监控</h1>
-          <div className="flex gap-3">
-            <button
-              onClick={loadLogs}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-lg transition-colors text-sm font-medium text-gray-700"
-            >
-              <RefreshCw className="w-4 h-4" />
-              刷新
-            </button>
-            <button
-              onClick={() => setShowStatistics(!showStatistics)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                showStatistics
-                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              <BarChart3 className="w-4 h-4" />
-              统计
-            </button>
-            <button
-              onClick={toggleStream}
-              disabled={loading}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium text-white ${
-                streaming
-                  ? "bg-red-600 hover:bg-red-700"
-                  : "bg-green-600 hover:bg-green-700"
-              } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
-            >
-              {streaming ? (
-                <>
-                  <Square className="w-4 h-4" />
-                  停止监控
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4" />
-                  开始监控
-                </>
-              )}
-            </button>
-            <button
-              onClick={exportLogs}
-              disabled={filteredLogs.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-lg transition-colors text-sm font-medium text-gray-700"
-              title="导出日志"
-            >
-              <Download className="w-4 h-4" />
-              导出
-            </button>
-          </div>
-        </div>
+        <h1 className="text-xl font-semibold text-gray-900 mb-4">日志监控</h1>
 
         {/* 搜索框 */}
         <div className="relative">
@@ -413,118 +361,179 @@ export default function Logs() {
           </div>
         )}
 
-        {/* 日志级别过滤 */}
-        <div className="flex items-center gap-2 mt-3">
-          <span className="text-sm text-gray-500">级别:</span>
-          <div className="flex gap-1">
+        {/* 日志级别过滤和操作按钮 */}
+        <div className="flex items-center gap-3 mt-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">级别:</span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => handleLevelChange("all")}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  logLevel === "all"
+                    ? "bg-gray-800 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                全部
+              </button>
+              <button
+                onClick={() => handleLevelChange("info")}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  logLevel === "info"
+                    ? "bg-blue-600 text-white"
+                    : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                }`}
+              >
+                INFO
+              </button>
+              <button
+                onClick={() => handleLevelChange("warn")}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  logLevel === "warn"
+                    ? "bg-amber-600 text-white"
+                    : "bg-amber-50 text-amber-600 hover:bg-amber-100"
+                }`}
+              >
+                WARN
+              </button>
+              <button
+                onClick={() => handleLevelChange("error")}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  logLevel === "error"
+                    ? "bg-red-600 text-white"
+                    : "bg-red-50 text-red-600 hover:bg-red-100"
+                }`}
+              >
+                ERROR
+              </button>
+            </div>
+          </div>
+
+          {/* 操作按钮 */}
+          <div className="flex items-center gap-2 ml-auto">
             <button
-              onClick={() => handleLevelChange("all")}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                logLevel === "all"
-                  ? "bg-gray-800 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              onClick={loadLogs}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-lg transition-colors text-sm font-medium text-gray-700"
             >
-              全部
+              <RefreshCw className="w-4 h-4" />
+              刷新
             </button>
             <button
-              onClick={() => handleLevelChange("info")}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                logLevel === "info"
-                  ? "bg-blue-600 text-white"
-                  : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+              onClick={() => setShowStatistics(!showStatistics)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium ${
+                showStatistics
+                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
-              INFO
+              <BarChart3 className="w-4 h-4" />
+              统计
             </button>
             <button
-              onClick={() => handleLevelChange("warn")}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                logLevel === "warn"
-                  ? "bg-amber-600 text-white"
-                  : "bg-amber-50 text-amber-600 hover:bg-amber-100"
-              }`}
+              onClick={exportLogs}
+              disabled={filteredLogs.length === 0}
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-lg transition-colors text-sm font-medium text-gray-700"
+              title="导出日志"
             >
-              WARN
+              <Download className="w-4 h-4" />
+              导出
             </button>
             <button
-              onClick={() => handleLevelChange("error")}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                logLevel === "error"
-                  ? "bg-red-600 text-white"
-                  : "bg-red-50 text-red-600 hover:bg-red-100"
-              }`}
+              onClick={toggleStream}
+              disabled={loading}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium text-white ${
+                streaming
+                  ? "bg-red-600 hover:bg-red-700"
+                  : "bg-green-600 hover:bg-green-700"
+              } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
             >
-              ERROR
+              {streaming ? (
+                <>
+                  <Square className="w-4 h-4" />
+                  停止
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4" />
+                  开始
+                </>
+              )}
             </button>
           </div>
-          {(searchQuery || logLevel !== "all") && (
-            <div className="ml-auto text-sm text-gray-500">
-              找到 {filteredLogs.length} 条匹配的日志（共 {logs.length} 条）
-            </div>
-          )}
         </div>
 
-        {/* 统计面板 */}
-        {showStatistics && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-900">日志统计</h3>
-              <span className="text-xs text-gray-500">共 {statistics.total} 条日志</span>
-            </div>
-
-            <div className="space-y-3">
-              {/* INFO */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-blue-600 font-medium">INFO</span>
-                  <span className="text-gray-600">
-                    {statistics.info} 条 ({statistics.infoPercent.toFixed(1)}%)
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${statistics.infoPercent}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* WARN */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-amber-600 font-medium">WARN</span>
-                  <span className="text-gray-600">
-                    {statistics.warn} 条 ({statistics.warnPercent.toFixed(1)}%)
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-amber-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${statistics.warnPercent}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* ERROR */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-red-600 font-medium">ERROR</span>
-                  <span className="text-gray-600">
-                    {statistics.error} 条 ({statistics.errorPercent.toFixed(1)}%)
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-red-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${statistics.errorPercent}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+        {/* 过滤结果提示 */}
+        {(searchQuery || logLevel !== "all") && (
+          <div className="mt-2 text-sm text-gray-500">
+            找到 {filteredLogs.length} 条匹配的日志（共 {logs.length} 条）
           </div>
         )}
       </div>
+
+      {/* 统计面板 */}
+      {showStatistics && (
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="max-w-6xl">
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900">日志统计</h3>
+                <span className="text-xs text-gray-500">共 {statistics.total} 条日志</span>
+              </div>
+
+              <div className="space-y-3">
+                {/* INFO */}
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-blue-600 font-medium">INFO</span>
+                    <span className="text-gray-600">
+                      {statistics.info} 条 ({statistics.infoPercent.toFixed(1)}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${statistics.infoPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* WARN */}
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-amber-600 font-medium">WARN</span>
+                    <span className="text-gray-600">
+                      {statistics.warn} 条 ({statistics.warnPercent.toFixed(1)}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-amber-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${statistics.warnPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* ERROR */}
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-red-600 font-medium">ERROR</span>
+                    <span className="text-gray-600">
+                      {statistics.error} 条 ({statistics.errorPercent.toFixed(1)}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-red-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${statistics.errorPercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 日志内容 */}
       <div

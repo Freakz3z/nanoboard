@@ -147,7 +147,7 @@ export default function CodeEditor() {
               </button>
               <button
                 onClick={saveConfig}
-                disabled={saving || !hasChanges || !!codeError}
+                disabled={loading || saving || !hasChanges || !!codeError}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg font-medium text-white transition-colors text-sm"
                 title={hasChanges ? "保存更改到配置文件" : "没有需要保存的更改"}
               >

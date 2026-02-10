@@ -24,14 +24,14 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="flex h-screen bg-white text-gray-900">
       {/* 侧边栏 */}
-      <aside className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col">
+      <aside className="w-56 bg-gray-50 border-r border-gray-200 flex flex-col">
         {/* Logo 区域 */}
         <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col items-center gap-3">
             <img
               src="/assets/logo.png"
               alt="Nanoboard Logo"
-              className="w-10 h-10 rounded-lg"
+              className="w-12 h-12 rounded-lg"
             />
             <h1 className="text-lg font-semibold text-gray-900">
               nanoboard

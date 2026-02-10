@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { configApi } from "../lib/tauri";
 import { useToast } from "../contexts/ToastContext";
 import {
-  Save,
   ChevronDown,
   ChevronUp,
   Plus,
@@ -34,6 +33,15 @@ interface Provider {
   apiBase?: string;
   default_model?: string;  // 仅用于 UI 辅助，不保存到配置
   models?: string[];       // 仅用于 UI 辅助，不保存到配置
+}
+
+// 每个 Provider 独立的 Agent 配置（存储在 localStorage）
+interface ProviderAgentConfig {
+  model?: string;
+  max_tokens?: number;
+  max_tool_iterations?: number;
+  temperature?: number;
+  workspace?: string;
 }
 
 interface AgentDefaults {
@@ -96,6 +104,7 @@ interface ConfigTemplate {
 }
 
 const TEMPLATES_STORAGE_KEY = "nanobot_config_templates";
+const PROVIDER_AGENT_CONFIGS_KEY = "nanoboard_provider_agent_configs";
 
 // 图标映射组件
 const ProviderIcon = ({ name, className }: { name: string; className?: string }) => {
@@ -363,17 +372,18 @@ const CHANNELS_CONFIG: Array<{
 
 export default function ConfigEditor() {
   const [config, setConfig] = useState<Config>({});
-  const [originalConfig, setOriginalConfig] = useState<Config>({});
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["providers"])
+    new Set(["providers", "channels"])
   );
   const [editingProvider, setEditingProvider] = useState<{
     isOpen: boolean;
     providerId: string;
     providerInfo: typeof AVAILABLE_PROVIDERS[0] | null;
-  }>({ isOpen: false, providerId: "", providerInfo: null });
+    activeTab: "api" | "agent";
+  }>({ isOpen: false, providerId: "", providerInfo: null, activeTab: "api" });
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [providerAgentConfigs, setProviderAgentConfigs] = useState<Record<string, ProviderAgentConfig>>({});
   const [showHistory, setShowHistory] = useState(false);
   const [historyVersions, setHistoryVersions] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -401,6 +411,7 @@ export default function ConfigEditor() {
 
   useEffect(() => {
     loadConfig();
+    loadProviderAgentConfigs();
 
     // 从 localStorage 加载展开状态
     const savedExpanded = localStorage.getItem("configEditorExpandedSections");
@@ -428,12 +439,80 @@ export default function ConfigEditor() {
         setConfig({});
       } else {
         setConfig(result as Config);
-        setOriginalConfig(result as Config);
-      }
+        }
     } catch (error) {
       toast.showError("加载配置失败");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function loadProviderAgentConfigs() {
+    try {
+      const stored = localStorage.getItem(PROVIDER_AGENT_CONFIGS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setProviderAgentConfigs(parsed);
+      }
+    } catch (error) {
+      console.error("加载 Provider Agent 配置失败:", error);
+    }
+  }
+
+  function saveProviderAgentConfigs() {
+    try {
+      localStorage.setItem(PROVIDER_AGENT_CONFIGS_KEY, JSON.stringify(providerAgentConfigs));
+    } catch (error) {
+      console.error("保存 Provider Agent 配置失败:", error);
+    }
+  }
+
+  function getProviderAgentConfig(providerId: string): ProviderAgentConfig {
+    return providerAgentConfigs[providerId] || {};
+  }
+
+  function updateProviderAgentConfig(providerId: string, field: keyof ProviderAgentConfig, value: any) {
+    const currentConfig = getProviderAgentConfig(providerId);
+    const updatedConfig = {
+      ...providerAgentConfigs,
+      [providerId]: {
+        ...currentConfig,
+        [field]: value,
+      },
+    };
+    setProviderAgentConfigs(updatedConfig);
+    saveProviderAgentConfigs();
+  }
+
+  async function applyProviderAgentConfig(providerId: string) {
+    const agentConfig = getProviderAgentConfig(providerId);
+    if (Object.keys(agentConfig).length === 0) {
+      toast.showInfo("该提供商没有保存的 Agent 配置");
+      return;
+    }
+
+    // 更新 config.agents.defaults
+    const updatedConfig = {
+      ...config,
+      agents: {
+        ...config.agents,
+        defaults: {
+          ...config.agents?.defaults,
+          ...agentConfig,
+        },
+      },
+    };
+    setConfig(updatedConfig);
+    setSelectedProviderId(providerId); // 标记为已选择
+    const providerName = AVAILABLE_PROVIDERS.find(p => p.id === providerId)?.name || providerId;
+    toast.showSuccess(`已应用 ${providerName} 的 Agent 配置`);
+
+    // 自动保存
+    try {
+      const configToSave = cleanConfigForSave(updatedConfig);
+      await configApi.save(configToSave);
+    } catch (error) {
+      toast.showError("自动保存配置失败");
     }
   }
 
@@ -494,32 +573,6 @@ export default function ConfigEditor() {
     return cleaned;
   }
 
-  async function saveConfig() {
-    setSaving(true);
-    try {
-      // 清理 UI 辅助字段
-      const configToSave = cleanConfigForSave(config);
-
-      const validation = await configApi.validate(configToSave);
-
-      if (!validation.valid && validation.errors.length > 0) {
-        toast.showError(`配置验证失败: ${validation.errors.join(", ")}`);
-        return;
-      }
-
-      await configApi.save(configToSave);
-      setOriginalConfig(configToSave);
-      setConfig(configToSave);
-      toast.showSuccess("配置已保存");
-    } catch (error) {
-      toast.showError("保存配置失败");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const hasChanges = JSON.stringify(config) !== JSON.stringify(originalConfig);
-
   function toggleSection(section: string) {
     const newExpanded = new Set(expandedSections);
     if (newExpanded.has(section)) {
@@ -530,9 +583,9 @@ export default function ConfigEditor() {
     setExpandedSections(newExpanded);
   }
 
-  function updateProvider(name: string, field: keyof Provider, value: any) {
+  async function updateProvider(name: string, field: keyof Provider, value: any) {
     const currentProvider = config.providers?.[name] || { name };
-    setConfig({
+    const updatedConfig = {
       ...config,
       providers: {
         ...config.providers,
@@ -541,7 +594,16 @@ export default function ConfigEditor() {
           [field]: value,
         },
       },
-    });
+    };
+    setConfig(updatedConfig);
+
+    // 自动保存
+    try {
+      const configToSave = cleanConfigForSave(updatedConfig);
+      await configApi.save(configToSave);
+    } catch (error) {
+      toast.showError("自动保存配置失败");
+    }
   }
 
   function removeProvider(name: string) {
@@ -563,8 +625,8 @@ export default function ConfigEditor() {
     });
   }
 
-  function updateChannel(name: string, enabled: boolean) {
-    setConfig({
+  async function updateChannel(name: string, enabled: boolean) {
+    const updatedConfig = {
       ...config,
       channels: {
         ...config.channels,
@@ -573,12 +635,21 @@ export default function ConfigEditor() {
           enabled,
         },
       },
-    });
+    };
+    setConfig(updatedConfig);
+
+    // 自动保存
+    try {
+      const configToSave = cleanConfigForSave(updatedConfig);
+      await configApi.save(configToSave);
+    } catch (error) {
+      toast.showError("自动保存配置失败");
+    }
   }
 
-  function updateChannelField(channelKey: string, field: string, value: any) {
+  async function updateChannelField(channelKey: string, field: string, value: any) {
     const currentChannel = config.channels?.[channelKey] || {};
-    setConfig({
+    const updatedConfig = {
       ...config,
       channels: {
         ...config.channels,
@@ -587,7 +658,16 @@ export default function ConfigEditor() {
           [field]: value,
         },
       },
-    });
+    };
+    setConfig(updatedConfig);
+
+    // 自动保存
+    try {
+      const configToSave = cleanConfigForSave(updatedConfig);
+      await configApi.save(configToSave);
+    } catch (error) {
+      toast.showError("自动保存配置失败");
+    }
   }
 
   async function loadHistory() {
@@ -741,17 +821,7 @@ export default function ConfigEditor() {
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold text-gray-900">配置编辑</h1>
-
-              {/* 状态指示器 */}
-              {hasChanges && (
-                <div className="flex items-center gap-1.5 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 text-sm font-medium">
-                  <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
-                  <span>未保存</span>
-                </div>
-              )}
-            </div>
+            <h1 className="text-xl font-semibold text-gray-900">配置编辑</h1>
             <div className="flex gap-2">
               <button
                 onClick={() => {
@@ -764,7 +834,6 @@ export default function ConfigEditor() {
                         // 恢复到默认配置并直接保存到文件
                         await configApi.save(DEFAULT_CONFIG);
                         setConfig(DEFAULT_CONFIG);
-                        setOriginalConfig(DEFAULT_CONFIG);
                         toast.showSuccess("已恢复默认配置");
                       } catch (error) {
                         toast.showError("恢复默认配置失败");
@@ -790,21 +859,6 @@ export default function ConfigEditor() {
               >
                 <History className="w-4 h-4" />
                 历史记录
-              </button>
-              {!hasChanges && (
-                <div className="flex items-center gap-1.5 text-green-600 bg-green-50 px-3 py-2 rounded-lg border border-green-200 text-sm font-medium">
-                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                  <span>已保存</span>
-                </div>
-              )}
-              <button
-                onClick={saveConfig}
-                disabled={saving || !hasChanges}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg font-medium text-white transition-colors text-sm"
-                title={hasChanges ? "保存更改到配置文件" : "没有需要保存的更改"}
-              >
-                <Save className="w-4 h-4" />
-                {saving ? "保存中..." : "保存配置"}
               </button>
             </div>
           </div>
@@ -1001,26 +1055,28 @@ export default function ConfigEditor() {
                   {AVAILABLE_PROVIDERS.map((provider) => {
                     const providerConfig = config.providers?.[provider.id];
                     const isConfigured = providerConfig && providerConfig.apiKey && providerConfig.apiKey.trim() !== "";
+                    const isSelected = selectedProviderId === provider.id;
 
                     return (
                       <div
                         key={provider.id}
-                        className={`group rounded-lg border transition-all cursor-pointer hover:shadow-md ${
-                          isConfigured
+                        className={`group rounded-lg border transition-all hover:shadow-md ${
+                          isSelected
                             ? "bg-green-50 border-green-200"
+                            : isConfigured
+                            ? "bg-yellow-50 border-yellow-200"
                             : "bg-white border-gray-200 hover:border-gray-300"
                         }`}
-                        onClick={() => {
-                          setEditingProvider({
-                            isOpen: true,
-                            providerId: provider.id,
-                            providerInfo: provider,
-                          });
-                        }}
                       >
                         <div className="w-full p-4 text-left">
                           <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-2">
+                            <div
+                              className="flex items-center gap-2 flex-1 cursor-pointer"
+                              onClick={() => {
+                                // 应用该提供商的 Agent 配置
+                                applyProviderAgentConfig(provider.id);
+                              }}
+                            >
                               <div className={`p-2 rounded-lg ${provider.colorClass.split(' ')[0]}`}>
                                 <ProviderIcon name={provider.icon} className={`w-5 h-5 ${provider.colorClass.split(' ')[1]}`} />
                               </div>
@@ -1029,8 +1085,13 @@ export default function ConfigEditor() {
                                   <h3 className="font-semibold text-gray-900 text-sm">
                                     {provider.name}
                                   </h3>
-                                  {isConfigured && (
+                                  {isSelected && (
                                     <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                                      已选择
+                                    </span>
+                                  )}
+                                  {!isSelected && isConfigured && (
+                                    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full">
                                       已配置
                                     </span>
                                   )}
@@ -1045,9 +1106,21 @@ export default function ConfigEditor() {
                                 </p>
                               </div>
                             </div>
-                            <div className="p-1.5 bg-white rounded-lg border border-gray-200 group-hover:border-blue-200 transition-colors">
-                              <Settings className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
-                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingProvider({
+                                  isOpen: true,
+                                  providerId: provider.id,
+                                  providerInfo: provider,
+                                  activeTab: "api",
+                                });
+                              }}
+                              className="p-2 bg-white rounded-lg border border-gray-200 group-hover:border-blue-200 transition-colors hover:bg-blue-50"
+                              title="配置 API 和 Agent 设置"
+                            >
+                              <Settings className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1067,7 +1140,8 @@ export default function ConfigEditor() {
           )}
         </div>
 
-        {/* Agents 配置 */}
+        {/* Agents 配置 - 已隐藏，每个提供商现在有自己的 Agent 配置 */}
+        {false && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <button
             onClick={() => toggleSection("agents")}
@@ -1171,6 +1245,7 @@ export default function ConfigEditor() {
             </div>
           )}
         </div>
+        )}
 
         {/* Channels 配置 */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -1194,72 +1269,81 @@ export default function ConfigEditor() {
           </button>
 
           {expandedSections.has("channels") && (
-            <div className="p-5 pt-0 space-y-2">
-              {CHANNELS_CONFIG.filter(channel => channel.key !== "terminal").map((channel) => {
-                const isEnabled = config.channels?.[channel.key]?.enabled || false;
-                return (
-                  <div
-                    key={channel.key}
-                    className={`group p-3 rounded-lg border transition-all ${
-                      isEnabled
-                        ? "bg-green-50 border-green-200"
-                        : "bg-gray-50 border-gray-200"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
+            <div className="p-5 pt-0 space-y-4">
+              {/* 可用的渠道列表 */}
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 mb-3">选择要配置的消息渠道：</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {CHANNELS_CONFIG.filter(channel => channel.key !== "terminal").map((channel) => {
+                    const isEnabled = config.channels?.[channel.key]?.enabled || false;
+                    return (
                       <div
-                        className="flex-1 cursor-pointer"
-                        onClick={() =>
-                          setEditingChannel({
-                            isOpen: true,
-                            channelKey: channel.key,
-                            channelInfo: channel,
-                          })
-                        }
+                        key={channel.key}
+                        className={`group rounded-lg border transition-all hover:shadow-md ${
+                          isEnabled
+                            ? "bg-green-50 border-green-200"
+                            : "bg-white border-gray-200 hover:border-gray-300"
+                        }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <MessageSquare className={`w-4 h-4 ${isEnabled ? "text-green-600" : "text-gray-500"}`} />
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-700">{channel.name}</span>
-                            <span className="text-xs text-gray-400">{channel.description} · 配置难度: {channel.difficulty}</span>
+                        <div className="w-full p-4 text-left">
+                          <div className="flex items-center justify-between">
+                            <div
+                              className="flex items-center gap-2 flex-1 cursor-pointer"
+                              onClick={() =>
+                                setEditingChannel({
+                                  isOpen: true,
+                                  channelKey: channel.key,
+                                  channelInfo: channel,
+                                })
+                              }
+                            >
+                              <div className={`p-2 rounded-lg ${channel.colorClass.split(' ')[0]}`}>
+                                <MessageSquare className={`w-5 h-5 ${channel.colorClass.split(' ')[1]}`} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold text-gray-900 text-sm">
+                                    {channel.name}
+                                  </h3>
+                                  {isEnabled && (
+                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                                      已启用
+                                    </span>
+                                  )}
+                                  {!isEnabled && (
+                                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                                      未启用
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {channel.description} · 难度: {channel.difficulty}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateChannel(channel.key, !isEnabled);
+                              }}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                isEnabled ? "bg-blue-600" : "bg-gray-300"
+                              }`}
+                              title={isEnabled ? "点击禁用" : "点击启用"}
+                            >
+                              <span
+                                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow ${
+                                  isEnabled ? "translate-x-5" : "translate-x-0.5"
+                                }`}
+                              />
+                            </button>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingChannel({
-                              isOpen: true,
-                              channelKey: channel.key,
-                              channelInfo: channel,
-                            });
-                          }}
-                          className="p-1.5 bg-white rounded-lg border border-gray-200 group-hover:border-blue-200 transition-colors opacity-0 group-hover:opacity-100"
-                          title="编辑配置"
-                        >
-                          <Settings className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateChannel(channel.key, !isEnabled);
-                          }}
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                            isEnabled ? "bg-blue-600" : "bg-gray-300"
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow ${
-                              isEnabled ? "translate-x-5" : "translate-x-0.5"
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              </div>
 
               {Object.keys(config.channels || {}).length === 0 && (
                 <EmptyState
@@ -1348,107 +1432,212 @@ export default function ConfigEditor() {
       {editingProvider.isOpen && editingProvider.providerInfo && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          onClick={() => setEditingProvider({ isOpen: false, providerId: "", providerInfo: null })}
+          onClick={() => setEditingProvider({ isOpen: false, providerId: "", providerInfo: null, activeTab: "api" })}
         >
           <div
-            className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6"
+            className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 mb-4">
-              <div className={`p-2 rounded-lg ${editingProvider.providerInfo.colorClass.split(' ')[0]}`}>
-                <ProviderIcon
-                  name={editingProvider.providerInfo.icon}
-                  className={`w-6 h-6 ${editingProvider.providerInfo.colorClass.split(' ')[1]}`}
-                />
+            {/* 头部 */}
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${editingProvider.providerInfo.colorClass.split(' ')[0]}`}>
+                  <ProviderIcon
+                    name={editingProvider.providerInfo.icon}
+                    className={`w-6 h-6 ${editingProvider.providerInfo.colorClass.split(' ')[1]}`}
+                  />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    编辑 {editingProvider.providerInfo.name} 配置
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {editingProvider.providerInfo.description}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  编辑 {editingProvider.providerInfo.name} 配置
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {editingProvider.providerInfo.description}
-                </p>
+
+              {/* 选项卡切换 */}
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => setEditingProvider({ ...editingProvider, activeTab: "api" })}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    editingProvider.activeTab === "api"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  API 配置
+                </button>
+                <button
+                  onClick={() => setEditingProvider({ ...editingProvider, activeTab: "agent" })}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    editingProvider.activeTab === "agent"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  Agent 配置
+                </button>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">
-                  API Key
-                </label>
-                <input
-                  type="password"
-                  value={config.providers?.[editingProvider.providerId]?.apiKey || ""}
-                  onChange={(e) =>
-                    updateProvider(editingProvider.providerId, "apiKey", e.target.value)
-                  }
-                  placeholder="sk-..."
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                />
-                {editingProvider.providerInfo.apiUrl && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    在 <a
-                      href={editingProvider.providerInfo.apiUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 hover:underline"
-                    >
-                      {editingProvider.providerInfo.apiUrl}
-                    </a>{" "}
-                    获取 API Key
-                  </p>
-                )}
-              </div>
+            {/* 内容区域 */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {editingProvider.activeTab === "api" ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      API Key
+                    </label>
+                    <input
+                      type="password"
+                      value={config.providers?.[editingProvider.providerId]?.apiKey || ""}
+                      onChange={(e) =>
+                        updateProvider(editingProvider.providerId, "apiKey", e.target.value)
+                      }
+                      placeholder="sk-..."
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                    {editingProvider.providerInfo.apiUrl && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        在 <a
+                          href={editingProvider.providerInfo.apiUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 hover:underline"
+                        >
+                          {editingProvider.providerInfo.apiUrl}
+                        </a>{" "}
+                        获取 API Key
+                      </p>
+                    )}
+                  </div>
 
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">
-                  API Base URL
-                </label>
-                <input
-                  type="text"
-                  value={config.providers?.[editingProvider.providerId]?.apiBase || ""}
-                  onChange={(e) =>
-                    updateProvider(editingProvider.providerId, "apiBase", e.target.value)
-                  }
-                  placeholder={editingProvider.providerInfo.apiBase || "https://api.example.com/v1"}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                />
-                {editingProvider.providerInfo.apiBase && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    默认值: {editingProvider.providerInfo.apiBase}
-                  </p>
-                )}
-              </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      API Base URL
+                    </label>
+                    <input
+                      type="text"
+                      value={config.providers?.[editingProvider.providerId]?.apiBase || ""}
+                      onChange={(e) =>
+                        updateProvider(editingProvider.providerId, "apiBase", e.target.value)
+                      }
+                      placeholder={editingProvider.providerInfo.apiBase || "https://api.example.com/v1"}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                    {editingProvider.providerInfo.apiBase && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        默认值: {editingProvider.providerInfo.apiBase}
+                      </p>
+                    )}
+                  </div>
 
-              {config.providers?.[editingProvider.providerId] && (
-                <div className="flex justify-end pt-2">
-                  <button
-                    onClick={() => {
-                      removeProvider(editingProvider.providerId);
-                      setEditingProvider({ isOpen: false, providerId: "", providerInfo: null });
-                    }}
-                    className="flex items-center gap-1 px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    删除配置
-                  </button>
+                  {config.providers?.[editingProvider.providerId] && (
+                    <div className="flex justify-end pt-2">
+                      <button
+                        onClick={() => {
+                          removeProvider(editingProvider.providerId);
+                          setEditingProvider({ isOpen: false, providerId: "", providerInfo: null, activeTab: "api" });
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        删除配置
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      默认模型 (model)
+                    </label>
+                    <input
+                      type="text"
+                      value={getProviderAgentConfig(editingProvider.providerId).model || ""}
+                      onChange={(e) =>
+                        updateProviderAgentConfig(editingProvider.providerId, "model", e.target.value)
+                      }
+                      placeholder="例如: anthropic/claude-opus-4-5"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">agent 使用的默认 LLM 模型</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      最大 Token 数 (max_tokens)
+                    </label>
+                    <input
+                      type="number"
+                      value={getProviderAgentConfig(editingProvider.providerId).max_tokens || 8192}
+                      onChange={(e) =>
+                        updateProviderAgentConfig(editingProvider.providerId, "max_tokens", parseInt(e.target.value))
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">单次请求的最大 token 数量</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      最大工具迭代次数 (max_tool_iterations)
+                    </label>
+                    <input
+                      type="number"
+                      value={getProviderAgentConfig(editingProvider.providerId).max_tool_iterations ?? 20}
+                      onChange={(e) =>
+                        updateProviderAgentConfig(editingProvider.providerId, "max_tool_iterations", parseInt(e.target.value))
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">agent 执行工具的最大迭代次数</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      工作区路径 (workspace)
+                    </label>
+                    <input
+                      type="text"
+                      value={getProviderAgentConfig(editingProvider.providerId).workspace || "~/.nanobot/workspace"}
+                      onChange={(e) =>
+                        updateProviderAgentConfig(editingProvider.providerId, "workspace", e.target.value)
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">agent 工作区的默认路径</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">
+                      温度 (temperature) (0.0 - 2.0)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="2"
+                      value={getProviderAgentConfig(editingProvider.providerId).temperature ?? 0.7}
+                      onChange={(e) =>
+                        updateProviderAgentConfig(editingProvider.providerId, "temperature", parseFloat(e.target.value))
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">控制生成文本的随机性，越高越随机</p>
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
+            {/* 底部按钮 */}
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
               <button
-                onClick={() => setEditingProvider({ isOpen: false, providerId: "", providerInfo: null })}
+                onClick={() => setEditingProvider({ isOpen: false, providerId: "", providerInfo: null, activeTab: "api" })}
                 className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium"
-              >
-                取消
-              </button>
-              <button
-                onClick={async () => {
-                  setEditingProvider({ isOpen: false, providerId: "", providerInfo: null });
-                  await saveConfig();
-                }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
               >
                 完成
               </button>
@@ -1545,15 +1734,6 @@ export default function ConfigEditor() {
               <button
                 onClick={() => setEditingChannel({ isOpen: false, channelKey: "", channelInfo: null })}
                 className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium"
-              >
-                取消
-              </button>
-              <button
-                onClick={async () => {
-                  setEditingChannel({ isOpen: false, channelKey: "", channelInfo: null });
-                  await saveConfig();
-                }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
               >
                 完成
               </button>
