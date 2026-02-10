@@ -98,9 +98,9 @@ export default function Logs() {
 
     if (logLevel !== "all") {
       const levelPatterns = {
-        info: /\[INFO\]/i,
-        warn: /\[WARN\]/i,
-        error: /\[ERROR\]/i,
+        info: /\|\s*INFO\s*\|/i,
+        warn: /\|\s*WARNING\s*\|/i,
+        error: /\|\s*ERROR\s*\|/i,
       };
       filtered = filtered.filter((log) => levelPatterns[logLevel].test(log));
     }
@@ -122,9 +122,11 @@ export default function Logs() {
     let error = 0;
 
     logsToAnalyze.forEach((log) => {
-      if (/\[INFO\]/i.test(log)) info++;
-      else if (/\[WARN\]/i.test(log)) warn++;
-      else if (/\[ERROR\]/i.test(log)) error++;
+      // 匹配格式: "YYYY-MM-DD HH:MM:SS.mmm | INFO     | module:function:line - message"
+      // 或者其他包含日志级别的格式
+      if (/\|\s*INFO\s*\|/i.test(log)) info++;
+      else if (/\|\s*WARNING\s*\|/i.test(log) || /\|\s*WARN\s*\|/i.test(log)) warn++;
+      else if (/\|\s*ERROR\s*\|/i.test(log)) error++;
     });
 
     return {
