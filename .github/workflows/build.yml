@@ -2,8 +2,6 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*.*.*'
   pull_request:
@@ -16,6 +14,8 @@ permissions:
 
 jobs:
   build:
+    # 只在 tag 触发或手动触发时构建，PR 只做类型检查
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -35,6 +35,22 @@ jobs:
 
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 90
+
+  # PR 时只做类型检查
+  type-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npm run build
 
     steps:
       - name: Checkout repository
@@ -88,24 +104,16 @@ jobs:
           # Also strip in bundle directory
           find src-tauri/target/release/bundle -type f -executable -exec strip --strip-all {} \; 2>/dev/null || true
 
-      - name: Upload artifacts (Linux/Windows)
-        if: matrix.platform.os != 'macos-latest'
+      - name: Upload artifacts (Linux/Windows/macOS x86_64)
+        if: matrix.platform.target != 'aarch64-apple-darwin'
         uses: actions/upload-artifact@v4
         with:
           name: nanoboard-${{ matrix.platform.target }}
           path: src-tauri/target/release/bundle/*
           if-no-files-found: warn
 
-      - name: Upload artifacts (macOS x86_64)
-        if: matrix.platform.os == 'macos-latest' && matrix.platform.target == 'x86_64-apple-darwin'
-        uses: actions/upload-artifact@v4
-        with:
-          name: nanoboard-${{ matrix.platform.target }}
-          path: src-tauri/target/x86_64-apple-darwin/release/bundle/*
-          if-no-files-found: warn
-
       - name: Upload artifacts (macOS ARM)
-        if: matrix.platform.os == 'macos-latest' && matrix.platform.target == 'aarch64-apple-darwin'
+        if: matrix.platform.target == 'aarch64-apple-darwin'
         uses: actions/upload-artifact@v4
         with:
           name: nanoboard-${{ matrix.platform.target }}
