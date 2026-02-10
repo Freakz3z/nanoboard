@@ -1,0 +1,28 @@
+[package]
+name = "nanoboard"
+version = "0.1.0"
+description = "Nanoboard - Manage your AI assistant"
+authors = ["Freakz3z <3020517046@qq.com>"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+log = "0.4"
+env_logger = "0.11"
+anyhow = "1.0"
+dirs = "5.0"
+notify = "6.1"
+crossbeam-channel = "0.5"
+sysinfo = "0.30"
+chrono = "0.4"
+portable-pty = "0.8"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
