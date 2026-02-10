@@ -161,6 +161,5 @@ jobs:
 
             ### Windows
             Double-click `nanoboard.exe`
-          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
