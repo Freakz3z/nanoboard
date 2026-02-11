@@ -625,7 +625,7 @@ export default function Dashboard() {
               { icon: FileText, label: "配置文件位置", value: "~/.nanobot/config.json" },
               { icon: FileText, label: "工作区位置", value: "~/.nanobot/workspace" },
               { icon: FileText, label: "日志位置", value: "~/.nanobot/logs/nanobot.log" },
-              { icon: Bot, label: "Nanobot 路径", value: nanobotPath || "未安装" },
+              { icon: Bot, label: "nanobot 位置", value: nanobotPath || "未安装" },
             ].map((item, index) => (
               <div
                 key={index}
