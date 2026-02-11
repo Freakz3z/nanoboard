@@ -65,6 +65,7 @@ export default function Dashboard() {
   const [status, setStatus] = useState<Status>({ running: false });
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [nanobotVersion, setNanobotVersion] = useState<NanobotVersion | null>(null);
+  const [nanobotPath, setNanobotPath] = useState<string | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(false);
   const toast = useToast();
@@ -82,6 +83,7 @@ export default function Dashboard() {
     // 初始加载
     refreshAll();
     loadNanobotVersion();
+    loadNanobotPath();
 
     // 定时刷新（每1秒）
     const interval = setInterval(() => {
@@ -133,6 +135,17 @@ export default function Dashboard() {
       setNanobotVersion(result);
     } catch (error) {
       console.error("获取版本信息失败:", error);
+    }
+  }
+
+  async function loadNanobotPath() {
+    try {
+      const result = await processApi.getNanobotPath();
+      if (result.found) {
+        setNanobotPath(result.path);
+      }
+    } catch (error) {
+      console.error("获取 nanobot 路径失败:", error);
     }
   }
 
@@ -612,6 +625,7 @@ export default function Dashboard() {
               { icon: FileText, label: "配置文件位置", value: "~/.nanobot/config.json" },
               { icon: FileText, label: "工作区位置", value: "~/.nanobot/workspace" },
               { icon: FileText, label: "日志位置", value: "~/.nanobot/logs/nanobot.log" },
+              { icon: Bot, label: "Nanobot 路径", value: nanobotPath || "未安装" },
             ].map((item, index) => (
               <div
                 key={index}

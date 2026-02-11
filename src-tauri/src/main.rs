@@ -41,6 +41,7 @@ async fn main() {
             process::onboard_nanobot,
             process::get_system_info,
             process::get_nanobot_version,
+            process::get_nanobot_path,
             process::check_nanobot_config,
             // Logger commands
             logger::get_logs,

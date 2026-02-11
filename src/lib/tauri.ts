@@ -26,6 +26,7 @@ export const processApi = {
   onboard: () => invoke<any>("onboard_nanobot"),
   getSystemInfo: () => invoke<any>("get_system_info"),
   getVersion: () => invoke<any>("get_nanobot_version"),
+  getNanobotPath: () => invoke<any>("get_nanobot_path"),
   checkConfig: () => invoke<any>("check_nanobot_config"),
 };
 

@@ -749,3 +749,19 @@ pub async fn get_nanobot_version() -> Result<serde_json::Value, String> {
         }))
     }
 }
+
+/// 获取 nanobot 可执行文件的完整路径
+#[tauri::command]
+pub async fn get_nanobot_path() -> Result<serde_json::Value, String> {
+    match find_command("nanobot") {
+        Some(path) => Ok(json!({
+            "path": path,
+            "found": true
+        })),
+        None => Ok(json!({
+            "path": null,
+            "found": false,
+            "message": "未找到 nanobot"
+        })),
+    }
+}
