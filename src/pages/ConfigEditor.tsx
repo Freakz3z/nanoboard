@@ -1594,7 +1594,6 @@ export default function ConfigEditor() {
       {editingProvider.isOpen && editingProvider.providerInfo && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          onClick={() => setEditingProvider({ isOpen: false, providerId: "", providerInfo: null, activeTab: "api" })}
         >
           <div
             className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
@@ -1812,7 +1811,6 @@ export default function ConfigEditor() {
       {editingChannel.isOpen && editingChannel.channelInfo && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          onClick={() => setEditingChannel({ isOpen: false, channelKey: "", channelInfo: null })}
         >
           <div
             className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto"

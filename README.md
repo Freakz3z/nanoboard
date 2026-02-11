@@ -1,8 +1,6 @@
 <div align="center">
 
-# Nanoboard
-
-<img src="public/assets/logo.png" alt="Nanoboard Logo" width="120" height="120">
+<img src="public/assets/logo.png" alt="Nanoboard Logo">
 
 **一个极轻量化的 nanobot 管理助手**
 

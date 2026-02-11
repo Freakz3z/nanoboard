@@ -175,14 +175,14 @@ fn find_via_pip(package: &str) -> Option<String> {
                 for cmd_name in &["nanobot", "nanobot-ai"] {
                     let cmd_path = bin_path.join(format!("{}{}", cmd_name, exe_ext));
                     if cmd_path.exists() {
-                        log::debug!("通过 pip show 找到 {}: {}", command, cmd_path.display());
+                        log::debug!("通过 pip show 找到 {}: {}", cmd_name, cmd_path.display());
                         return Some(cmd_path.to_string_lossy().to_string());
                     }
                 }
             }
         }
     }
-    log::debug!("通过 pip show 未找到 {}", command);
+    log::debug!("通过 pip show 未找到 {}", package);
     None
 }
 
