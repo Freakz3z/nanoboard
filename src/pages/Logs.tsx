@@ -1,14 +1,16 @@
 import { useEffect, useState, useRef } from "react";
 import { loggerApi, events } from "../lib/tauri";
 import { useToast } from "../contexts/ToastContext";
-import { Play, Square, RefreshCw, Search, X, Inbox, Download, BarChart3, Regex } from "lucide-react";
+import { Play, Square, Search, X, Inbox, Download, BarChart3, Regex } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 
 interface LogStatistics {
   total: number;
+  debug: number;
   info: number;
   warn: number;
   error: number;
+  debugPercent: number;
   infoPercent: number;
   warnPercent: number;
   errorPercent: number;
@@ -23,13 +25,15 @@ export default function Logs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [useRegex, setUseRegex] = useState(false);
   const [regexError, setRegexError] = useState<string | null>(null);
-  const [logLevel, setLogLevel] = useState<"all" | "info" | "warn" | "error">("all");
+  const [logLevel, setLogLevel] = useState<"all" | "debug" | "info" | "warn" | "error">("all");
   const [showStatistics, setShowStatistics] = useState(false);
   const [statistics, setStatistics] = useState<LogStatistics>({
     total: 0,
+    debug: 0,
     info: 0,
     warn: 0,
     error: 0,
+    debugPercent: 0,
     infoPercent: 0,
     warnPercent: 0,
     errorPercent: 0,
@@ -53,9 +57,12 @@ export default function Logs() {
       // 检查之前是否正在监控
       const wasStreaming = localStorage.getItem("logStreaming") === "true";
       if (wasStreaming) {
-        // 重新建立监听
+        // 重新启动监控（包括后端 watcher 和前端事件监听）
         setTimeout(async () => {
           try {
+            // 首先重新启动后端 watcher
+            await loggerApi.startStream();
+
             // 监听日志更新 - 只负责添加日志，不应用过滤
             const unlisten = await events.onLogUpdate((newLogs) => {
               setLogs((prev) => {
@@ -69,10 +76,22 @@ export default function Logs() {
             setStreaming(true);
           } catch (error) {
             console.error("恢复监控失败:", error);
+            // 如果恢复失败，清除状态
+            localStorage.setItem("logStreaming", "false");
+            setStreaming(false);
           }
         }, 100);
       }
     }
+
+    // 组件卸载时清理事件监听器
+    return () => {
+      const unlisten = (window as any).__logUnlisten;
+      if (unlisten) {
+        unlisten().catch((e: unknown) => console.error("取消监听失败:", e));
+        (window as any).__logUnlisten = null;
+      }
+    };
   }, []);
 
   // 应用过滤 - 当日志、搜索条件或级别改变时重新过滤
@@ -99,6 +118,7 @@ export default function Logs() {
 
     if (logLevel !== "all") {
       const levelPatterns = {
+        debug: /\|\s*DEBUG\s*\|/i,
         info: /\|\s*INFO\s*\|/i,
         warn: /\|\s*WARNING\s*\|/i,
         error: /\|\s*ERROR\s*\|/i,
@@ -118,6 +138,7 @@ export default function Logs() {
 
   function calculateStatistics(logsToAnalyze: string[]): LogStatistics {
     const total = logsToAnalyze.length;
+    let debug = 0;
     let info = 0;
     let warn = 0;
     let error = 0;
@@ -125,16 +146,19 @@ export default function Logs() {
     logsToAnalyze.forEach((log) => {
       // 匹配格式: "YYYY-MM-DD HH:MM:SS.mmm | INFO     | module:function:line - message"
       // 或者其他包含日志级别的格式
-      if (/\|\s*INFO\s*\|/i.test(log)) info++;
+      if (/\|\s*DEBUG\s*\|/i.test(log)) debug++;
+      else if (/\|\s*INFO\s*\|/i.test(log)) info++;
       else if (/\|\s*WARNING\s*\|/i.test(log) || /\|\s*WARN\s*\|/i.test(log)) warn++;
       else if (/\|\s*ERROR\s*\|/i.test(log)) error++;
     });
 
     return {
       total,
+      debug,
       info,
       warn,
       error,
+      debugPercent: total > 0 ? (debug / total) * 100 : 0,
       infoPercent: total > 0 ? (info / total) * 100 : 0,
       warnPercent: total > 0 ? (warn / total) * 100 : 0,
       errorPercent: total > 0 ? (error / total) * 100 : 0,
@@ -157,7 +181,7 @@ export default function Logs() {
     }
   }
 
-  function filterLogs(logsToFilter: string[], query: string, level: "all" | "info" | "warn" | "error") {
+  function filterLogs(logsToFilter: string[], query: string, level: "all" | "debug" | "info" | "warn" | "error") {
     let filtered = logsToFilter;
 
     // 应用搜索过滤
@@ -187,9 +211,10 @@ export default function Logs() {
     // 应用级别过滤
     if (level !== "all") {
       const levelPatterns = {
-        info: /\[INFO\]/i,
-        warn: /\[WARN\]/i,
-        error: /\[ERROR\]/i,
+        debug: /\|\s*DEBUG\s*\|/i,
+        info: /\|\s*INFO\s*\|/i,
+        warn: /\|\s*WARNING\s*\|/i,
+        error: /\|\s*ERROR\s*\|/i,
       };
       filtered = filtered.filter((log) => levelPatterns[level].test(log));
     }
@@ -202,7 +227,7 @@ export default function Logs() {
     filterLogs(logs, value, logLevel);
   }
 
-  function handleLevelChange(level: "all" | "info" | "warn" | "error") {
+  function handleLevelChange(level: "all" | "debug" | "info" | "warn" | "error") {
     setLogLevel(level);
     filterLogs(logs, searchQuery, level);
   }
@@ -387,6 +412,16 @@ export default function Logs() {
                 INFO
               </button>
               <button
+                onClick={() => handleLevelChange("debug")}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  logLevel === "debug"
+                    ? "bg-gray-600 text-white"
+                    : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                DEBUG
+              </button>
+              <button
                 onClick={() => handleLevelChange("warn")}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   logLevel === "warn"
@@ -411,14 +446,6 @@ export default function Logs() {
 
           {/* 操作按钮 */}
           <div className="flex items-center gap-2 ml-auto">
-            <button
-              onClick={loadLogs}
-              disabled={loading}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed rounded-lg transition-colors text-sm font-medium text-gray-700"
-            >
-              <RefreshCw className="w-4 h-4" />
-              刷新
-            </button>
             <button
               onClick={() => setShowStatistics(!showStatistics)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium ${
@@ -494,6 +521,22 @@ export default function Logs() {
                     <div
                       className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${statistics.infoPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* DEBUG */}
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-gray-600 font-medium">DEBUG</span>
+                    <span className="text-gray-600">
+                      {statistics.debug} 条 ({statistics.debugPercent.toFixed(1)}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-gray-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${statistics.debugPercent}%` }}
                     />
                   </div>
                 </div>

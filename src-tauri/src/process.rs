@@ -676,6 +676,15 @@ pub async fn get_system_info() -> Result<serde_json::Value, String> {
         }
     }
 
+    // 获取磁盘使用情况（平台特定）
+    let (total_disk, available_disk) = get_disk_usage();
+    let used_disk = total_disk.saturating_sub(available_disk);
+    let disk_usage_percent = if total_disk > 0 {
+        (used_disk as f64 / total_disk as f64) * 100.0
+    } else {
+        0.0
+    };
+
     Ok(json!({
         "cpu": {
             "usage": cpu_usage,
@@ -690,8 +699,109 @@ pub async fn get_system_info() -> Result<serde_json::Value, String> {
             "available_text": format_bytes(available_memory),
             "usage_percent": memory_usage_percent,
             "usage_text": format!("{:.1}%", memory_usage_percent)
+        },
+        "disk": {
+            "total": total_disk,
+            "total_text": format_bytes(total_disk),
+            "used": used_disk,
+            "used_text": format_bytes(used_disk),
+            "available": available_disk,
+            "available_text": format_bytes(available_disk),
+            "usage_percent": disk_usage_percent,
+            "usage_text": format!("{:.1}%", disk_usage_percent)
         }
     }))
+}
+
+/// 获取磁盘使用情况（平台特定实现）
+#[cfg(target_os = "macos")]
+fn get_disk_usage() -> (u64, u64) {
+    use std::process::Command;
+    // macOS 使用 df 命令获取根分区磁盘信息
+    if let Ok(output) = Command::new("df")
+        .args(["-k", "/"])
+        .output()
+    {
+        let content = String::from_utf8_lossy(&output.stdout);
+        let lines: Vec<&str> = content.lines().collect();
+        // 跳过标题行，读取第一行数据
+        if lines.len() > 1 {
+            if let Some(line) = lines.get(1) {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                // df -k 输出格式：Filesystem 1K-blocks Used Available Capacity
+                // 索引：0=filesystem, 1=total, 2=used, 3=available
+                if parts.len() >= 4 {
+                    let total_kb: u64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+                    let avail_kb: u64 = parts.get(3).and_then(|s| s.parse().ok()).unwrap_or(0);
+                    return (total_kb * 1024, avail_kb * 1024);
+                }
+            }
+        }
+    }
+    (0, 0)
+}
+
+#[cfg(target_os = "linux")]
+fn get_disk_usage() -> (u64, u64) {
+    use std::fs;
+    // Linux 读取 /proc/meminfo 或使用 df 命令
+    if let Ok(output) = std::process::Command::new("df")
+        .args(["-k", "/"])
+        .output()
+    {
+        let content = String::from_utf8_lossy(&output.stdout);
+        let lines: Vec<&str> = content.lines().collect();
+        if lines.len() > 1 {
+            if let Some(line) = lines.get(1) {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 4 {
+                    let total_kb: u64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+                    let avail_kb: u64 = parts.get(3).and_then(|s| s.parse().ok()).unwrap_or(0);
+                    return (total_kb * 1024, avail_kb * 1024);
+                }
+            }
+        }
+    }
+    (0, 0)
+}
+
+#[cfg(target_os = "windows")]
+fn get_disk_usage() -> (u64, u64) {
+    use std::process::Command;
+    // Windows 使用 wmic 或 PowerShell 获取磁盘信息
+    if let Ok(output) = Command::new("powershell")
+        .args(&[
+            "-Command",
+            "Get-PSDrive C | Where-Object {$_.DriveType -eq 3} | Select-Object -Property Size,FreeSpace",
+        ])
+        .output()
+    {
+        let content = String::from_utf8_lossy(&output.stdout);
+        // 解析 PowerShell 输出
+        // 格式：Size（总字节数）, FreeSpace（可用字节数）
+        let mut total_bytes = 0u64;
+        let mut free_bytes = 0u64;
+
+        for line in content.lines() {
+            if line.contains("Size") {
+                if let Some(value) = line.split('=').nth(1) {
+                    if let Ok(bytes) = value.trim().parse::<u64>() {
+                        total_bytes = bytes;
+                    }
+                }
+            } else if line.contains("FreeSpace") {
+                if let Some(value) = line.split('=').nth(1) {
+                    if let Ok(bytes) = value.trim().parse::<u64>() {
+                        free_bytes = bytes;
+                    }
+                }
+            }
+        }
+
+        (total_bytes, free_bytes)
+    } else {
+        (0, 0)
+    }
 }
 
 /// 检查 nanobot 配置是否完整

@@ -4,6 +4,7 @@
 mod config;
 mod process;
 mod logger;
+mod network;
 mod session;
 
 use std::sync::Mutex;
@@ -24,6 +25,8 @@ async fn main() {
             nanobot_process: Mutex::new(None),
         })
         .manage(Arc::new(tokio::sync::Mutex::new(logger::FileTracker::new())))
+        .manage(Arc::new(logger::WatcherHandle::new()))
+        .manage(std::sync::Mutex::new(network::NetworkMonitor::new()))
         .invoke_handler(tauri::generate_handler![
             // Config commands
             config::load_config,
@@ -45,8 +48,12 @@ async fn main() {
             process::check_nanobot_config,
             // Logger commands
             logger::get_logs,
+            logger::get_log_statistics,
             logger::start_log_stream,
             logger::stop_log_stream,
+            // Network commands
+            network::init_network_monitor,
+            network::get_network_stats,
             // Session commands
             session::list_sessions,
             session::get_session_memory,

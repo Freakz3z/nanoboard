@@ -1,23 +1,20 @@
 import { useEffect, useState } from "react";
-import { processApi, configApi } from "../lib/tauri";
-import { useToast } from "../contexts/ToastContext";
+import { processApi, configApi, loggerApi, networkApi } from "../lib/tauri";
+import NetworkMonitor from "../components/NetworkMonitor";
 import {
-  Play,
-  Square,
   Activity,
   CheckCircle,
   Clock,
   FileText,
-  Download,
-  Rocket,
   Zap,
   Cpu,
   HardDrive,
+  Database,
   Info,
-  RefreshCw,
   MessageSquare,
   Bot,
   Server,
+  TrendingUp,
 } from "lucide-react";
 
 interface Status {
@@ -41,12 +38,36 @@ interface SystemInfo {
     usage_percent: number;
     usage_text: string;
   };
+  disk: {
+    total: number;
+    total_text: string;
+    used: number;
+    used_text: string;
+    available: number;
+    available_text: string;
+    usage_percent: number;
+    usage_text: string;
+  };
 }
 
 interface NanobotVersion {
   installed: boolean;
   version: string | null;
   message: string;
+}
+
+interface LogStatistics {
+  total: number;
+  debug: number;
+  info: number;
+  warn: number;
+  error: number;
+}
+
+interface NetworkData {
+  timestamp: number;
+  upload: number;
+  download: number;
 }
 
 interface Config {
@@ -56,6 +77,7 @@ interface Config {
       model?: string;
       max_tokens?: number;
       temperature?: number;
+      max_tool_iterations?: number;
     };
   };
   channels?: Record<string, any>;
@@ -67,8 +89,8 @@ export default function Dashboard() {
   const [nanobotVersion, setNanobotVersion] = useState<NanobotVersion | null>(null);
   const [nanobotPath, setNanobotPath] = useState<string | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
-  const [loading, setLoading] = useState(false);
-  const toast = useToast();
+  const [logStatistics, setLogStatistics] = useState<LogStatistics | null>(null);
+  const [networkData, setNetworkData] = useState<NetworkData[]>([]);
 
   // 刷新所有状态的函数
   async function refreshAll() {
@@ -76,6 +98,7 @@ export default function Dashboard() {
       loadStatus(),
       loadSystemInfo(),
       loadConfig(),
+      loadLogStatistics(),
     ]);
   }
 
@@ -85,9 +108,25 @@ export default function Dashboard() {
     loadNanobotVersion();
     loadNanobotPath();
 
+    // 初始化网络监控
+    networkApi.initMonitor().catch(console.error);
+
+    // 初始化网络数据（60秒历史）
+    const initialData: NetworkData[] = [];
+    const now = Date.now();
+    for (let i = 60; i >= 0; i--) {
+      initialData.push({
+        timestamp: now - i * 1000,
+        upload: 0,
+        download: 0,
+      });
+    }
+    setNetworkData(initialData);
+
     // 定时刷新（每1秒）
     const interval = setInterval(() => {
       refreshAll();
+      updateNetworkData();
     }, 1000);
 
     // 页面可见性变化时立即刷新
@@ -160,117 +199,29 @@ export default function Dashboard() {
     }
   }
 
-  async function handleStart() {
-    setLoading(true);
+  async function loadLogStatistics() {
     try {
-      // 先检查配置
-      const configCheck = await processApi.checkConfig();
-      if (!configCheck.valid) {
-        toast.showWarning(configCheck.message || "配置检查失败");
-        // 如果是缺少 API key，提示用户去配置页面
-        if (configCheck.issue === "api_key_missing") {
-          toast.showInfo("请在配置编辑器中添加 API key");
-        }
-        setLoading(false);
-        return;
-      }
-
-      const result = await processApi.start(18790);
-      if (result.status === "started") {
-        await refreshAll();
-        localStorage.setItem("autoStartLogMonitor", "true");
-        toast.showSuccess("nanobot 启动成功");
-      } else if (result.status === "already_running") {
-        await refreshAll();
-        localStorage.setItem("autoStartLogMonitor", "true");
-        toast.showInfo("nanobot 已经在运行中");
-      } else if (result.status === "failed") {
-        // 显示详细的失败信息
-        await refreshAll();
-        toast.showError(result.message || "nanobot 启动失败");
-      }
+      const result = await loggerApi.getStatistics();
+      setLogStatistics(result);
     } catch (error) {
-      toast.showError("启动失败，请检查配置");
-    } finally {
-      setLoading(false);
+      console.error("获取日志统计失败:", error);
     }
   }
 
-  async function handleDownload() {
-    setLoading(true);
+  // 更新网络数据（从后端获取真实统计）
+  async function updateNetworkData() {
     try {
-      const result = await processApi.download();
-      if (result.success) {
-        toast.showSuccess("nanobot 下载成功");
-      } else {
-        toast.showWarning("下载完成，请检查是否成功");
-      }
+      const stats = await networkApi.getStats();
+      setNetworkData(prev => {
+        const newData = [...prev.slice(-59), {
+          timestamp: Date.now(),
+          upload: stats.upload_speed || 0,
+          download: stats.download_speed || 0,
+        }];
+        return newData;
+      });
     } catch (error) {
-      toast.showError("下载失败，请确保已安装 pip");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleOnboard() {
-    setLoading(true);
-    try {
-      const result = await processApi.onboard();
-      if (result.success) {
-        toast.showSuccess("nanobot 初始化成功");
-      } else {
-        toast.showWarning("初始化完成，请检查是否成功");
-      }
-    } catch (error) {
-      toast.showError("初始化失败，请先下载 nanobot");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleStop() {
-    setLoading(true);
-    try {
-      await processApi.stop();
-      await loadStatus();
-      toast.showSuccess("nanobot 已停止");
-    } catch (error) {
-      toast.showError("停止失败");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleRestart() {
-    if (!status.running) {
-      toast.showInfo("nanobot 未运行，无法重启");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // 先停止
-      await processApi.stop();
-      toast.showInfo("正在重启 nanobot...");
-
-      // 等待 2 秒确保进程完全停止
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // 重新启动
-      const result = await processApi.start(18790);
-      if (result.status === "started") {
-        await refreshAll();
-        toast.showSuccess("nanobot 重启成功");
-      } else if (result.status === "failed") {
-        await refreshAll();
-        toast.showError(result.message || "nanobot 重启失败");
-      }
-    } catch (error) {
-      toast.showError("重启失败");
-      // 尝试恢复状态
-      await loadStatus();
-    } finally {
-      setLoading(false);
+      console.error("获取网络统计失败:", error);
     }
   }
 
@@ -339,296 +290,275 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 当前配置概览 */}
+        {/* 配置概览 */}
         {config && (
-          <div className="p-6 bg-white rounded-lg border border-gray-200">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900">
-              <Server className="w-5 h-5 text-blue-600" />
-              当前配置概览
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* LLM 配置 */}
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="p-1.5 bg-blue-50 rounded-lg">
-                    <Server className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-gray-900">LLM Provider</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* LLM 配置 */}
+            <div className="p-5 bg-white rounded-lg border border-gray-200 card-hover">
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <Server className="w-5 h-5 text-blue-600" />
                 </div>
-                {config.providers && Object.keys(config.providers).length > 0 ? (
-                  <div className="space-y-2">
-                    {Object.keys(config.providers).slice(0, 3).map((providerKey) => (
-                      <div key={providerKey} className="flex items-center justify-between">
-                        <span className="text-xs text-gray-600">{providerKey}</span>
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
-                          已配置
+              </div>
+              <p className="text-xs text-gray-500 mb-3">LLM Provider</p>
+              {config.providers && Object.keys(config.providers).length > 0 ? (
+                <div className="space-y-2">
+                  {Object.keys(config.providers).slice(0, 4).map((providerKey) => (
+                    <div key={providerKey} className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600">{providerKey}</span>
+                      <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                        已配置
+                      </span>
+                    </div>
+                  ))}
+                  {Object.keys(config.providers).length > 4 && (
+                    <p className="text-xs text-gray-500">
+                      共 {Object.keys(config.providers).length} 个 Provider
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500">暂无配置</p>
+              )}
+            </div>
+
+            {/* Agent 配置 */}
+            <div className="p-5 bg-white rounded-lg border border-gray-200 card-hover">
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2 bg-indigo-50 rounded-lg">
+                  <Bot className="w-5 h-5 text-indigo-600" />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mb-3">Agent 配置</p>
+              {config.agents?.defaults ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">模型</span>
+                    <span className="text-xs font-medium text-gray-700 truncate max-w-[120px]" title={config.agents.defaults.model}>
+                      {config.agents.defaults.model || '-'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">最大 Token</span>
+                    <span className="text-xs font-medium text-gray-700">
+                      {config.agents.defaults.max_tokens || '-'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">最大工具迭代次数</span>
+                    <span className="text-xs font-medium text-gray-700">
+                      {config.agents.defaults.max_tool_iterations || '-'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">温度</span>
+                    <span className="text-xs font-medium text-gray-700">
+                      {config.agents.defaults.temperature || '-'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500">暂无配置</p>
+              )}
+            </div>
+
+            {/* 消息渠道 */}
+            <div className="p-5 bg-white rounded-lg border border-gray-200 card-hover">
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2 bg-purple-50 rounded-lg">
+                  <MessageSquare className="w-5 h-5 text-purple-600" />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mb-3">消息渠道</p>
+              {config.channels && Object.keys(config.channels).length > 0 ? (
+                <div className="space-y-2">
+                  {Object.entries(config.channels)
+                    .filter(([_, channel]: [string, any]) => channel?.enabled)
+                    .slice(0, 3)
+                    .map(([channelKey]) => (
+                      <div key={channelKey} className="flex items-center justify-between">
+                        <span className="text-xs text-gray-600 capitalize">{channelKey}</span>
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
+                          已启用
                         </span>
                       </div>
                     ))}
-                    {Object.keys(config.providers).length > 3 && (
-                      <p className="text-xs text-gray-500">
-                        共 {Object.keys(config.providers).length} 个 Provider
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-500">暂无配置</p>
-                )}
-              </div>
-
-              {/* Agent 配置 */}
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="p-1.5 bg-indigo-50 rounded-lg">
-                    <Bot className="w-4 h-4 text-indigo-600" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-gray-900">Agent 配置</h3>
+                  {Object.values(config.channels).filter((c: any) => c?.enabled).length === 0 && (
+                    <p className="text-xs text-gray-500">暂无启用渠道</p>
+                  )}
+                  {Object.values(config.channels).filter((c: any) => c?.enabled).length > 3 && (
+                    <p className="text-xs text-gray-500">
+                      共 {Object.values(config.channels).filter((c: any) => c?.enabled).length} 个渠道
+                    </p>
+                  )}
                 </div>
-                {config.agents?.defaults ? (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">模型</span>
-                      <span className="text-xs font-medium text-gray-700 truncate max-w-[120px]" title={config.agents.defaults.model}>
-                        {config.agents.defaults.model || '-'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">最大 Token</span>
-                      <span className="text-xs font-medium text-gray-700">
-                        {config.agents.defaults.max_tokens || '-'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">温度</span>
-                      <span className="text-xs font-medium text-gray-700">
-                        {config.agents.defaults.temperature || '-'}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-500">暂无配置</p>
-                )}
-              </div>
-
-              {/* 消息渠道 */}
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="p-1.5 bg-purple-50 rounded-lg">
-                    <MessageSquare className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-gray-900">消息渠道</h3>
-                </div>
-                {config.channels && Object.keys(config.channels).length > 0 ? (
-                  <div className="space-y-2">
-                    {Object.entries(config.channels)
-                      .filter(([_, channel]: [string, any]) => channel?.enabled)
-                      .slice(0, 3)
-                      .map(([channelKey]) => (
-                        <div key={channelKey} className="flex items-center justify-between">
-                          <span className="text-xs text-gray-600 capitalize">{channelKey}</span>
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
-                            已启用
-                          </span>
-                        </div>
-                      ))}
-                    {Object.values(config.channels).filter((c: any) => c?.enabled).length === 0 && (
-                      <p className="text-xs text-gray-500">暂无启用渠道</p>
-                    )}
-                    {Object.values(config.channels).filter((c: any) => c?.enabled).length > 3 && (
-                      <p className="text-xs text-gray-500">
-                        共 {Object.values(config.channels).filter((c: any) => c?.enabled).length} 个渠道
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-500">暂无配置</p>
-                )}
-              </div>
+              ) : (
+                <p className="text-xs text-gray-500">暂无配置</p>
+              )}
             </div>
           </div>
         )}
 
         {/* 系统资源监控 */}
         {systemInfo && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* CPU 使用率 */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* 性能监控 */}
             <div className="p-5 bg-white rounded-lg border border-gray-200 card-hover">
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Cpu className="w-5 h-5 text-blue-600" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-indigo-50 rounded-lg">
+                  <Activity className="w-5 h-5 text-indigo-600" />
                 </div>
-                <span className="text-sm font-medium text-gray-700">
-                  {systemInfo.cpu.usage_text}
-                </span>
+                <span className="text-xs font-medium text-gray-500">性能监控</span>
               </div>
-              <p className="text-xs text-gray-500 mb-2">CPU 使用率</p>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(systemInfo.cpu.usage, 100)}%` }}
-                />
+              <div className="space-y-3">
+                {/* CPU */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Cpu className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="text-xs text-gray-600">CPU</span>
+                    </div>
+                    <span className="text-xs font-medium text-gray-700">{systemInfo.cpu.usage_text}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div
+                      className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(systemInfo.cpu.usage, 100)}%` }}
+                    />
+                  </div>
+                </div>
+                {/* 内存 */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <HardDrive className="w-3.5 h-3.5 text-green-600" />
+                      <span className="text-xs text-gray-600">内存</span>
+                    </div>
+                    <span className="text-xs font-medium text-gray-700">{systemInfo.memory.usage_text}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div
+                      className="bg-green-600 h-1.5 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(systemInfo.memory.usage_percent, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {systemInfo.memory.used_text} / {systemInfo.memory.total_text}
+                  </p>
+                </div>
+                {/* 磁盘 */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Database className="w-3.5 h-3.5 text-purple-600" />
+                      <span className="text-xs text-gray-600">磁盘</span>
+                    </div>
+                    <span className="text-xs font-medium text-gray-700">{systemInfo.disk.usage_text}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div
+                      className="bg-purple-600 h-1.5 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(systemInfo.disk.usage_percent, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {systemInfo.disk.used_text} / {systemInfo.disk.total_text}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* 内存使用率 */}
-            <div className="p-5 bg-white rounded-lg border border-gray-200 card-hover">
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-green-50 rounded-lg">
-                  <HardDrive className="w-5 h-5 text-green-600" />
+            {/* 网络监控折线图 */}
+            <div className="bg-white rounded-lg border border-gray-200 card-hover overflow-hidden">
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-2 bg-cyan-50 rounded-lg">
+                    <TrendingUp className="w-5 h-5 text-cyan-600" />
+                  </div>
+                  <span className="text-xs font-medium text-gray-500">网络监控</span>
                 </div>
-                <span className="text-sm font-medium text-gray-700">
-                  {systemInfo.memory.usage_text}
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 mb-2">
-                {systemInfo.memory.used_text} / {systemInfo.memory.total_text}
-              </p>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-600 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(systemInfo.memory.usage_percent, 100)}%` }}
-                />
+                <NetworkMonitor data={networkData} />
               </div>
             </div>
+
+            {/* 日志监控 */}
+            {logStatistics && (
+              <div className="p-5 bg-white rounded-lg border border-gray-200 card-hover">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-2 bg-purple-50 rounded-lg">
+                    <FileText className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">
+                    {logStatistics.total} 条
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mb-3">日志统计</p>
+                <div className="space-y-2">
+                  {/* DEBUG */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-600">DEBUG</span>
+                      <span className="text-gray-700 font-medium">
+                        {logStatistics.debug} ({logStatistics.total > 0 ? ((logStatistics.debug / logStatistics.total) * 100).toFixed(1) : '0'}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className="bg-gray-600 h-1.5 rounded-full transition-all duration-500"
+                        style={{ width: `${logStatistics.total > 0 ? (logStatistics.debug / logStatistics.total) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* INFO */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-blue-600">INFO</span>
+                      <span className="text-gray-700 font-medium">
+                        {logStatistics.info} ({logStatistics.total > 0 ? ((logStatistics.info / logStatistics.total) * 100).toFixed(1) : '0'}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
+                        style={{ width: `${logStatistics.total > 0 ? (logStatistics.info / logStatistics.total) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* WARN */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-amber-600">WARN</span>
+                      <span className="text-gray-700 font-medium">
+                        {logStatistics.warn} ({logStatistics.total > 0 ? ((logStatistics.warn / logStatistics.total) * 100).toFixed(1) : '0'}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className="bg-amber-600 h-1.5 rounded-full transition-all duration-500"
+                        style={{ width: `${logStatistics.total > 0 ? (logStatistics.warn / logStatistics.total) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* ERROR */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-red-600">ERROR</span>
+                      <span className="text-gray-700 font-medium">
+                        {logStatistics.error} ({logStatistics.total > 0 ? ((logStatistics.error / logStatistics.total) * 100).toFixed(1) : '0'}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className="bg-red-600 h-1.5 rounded-full transition-all duration-500"
+                        style={{ width: `${logStatistics.total > 0 ? (logStatistics.error / logStatistics.total) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
-
-        {/* 快速操作 */}
-        <div className="p-6 bg-white rounded-lg border border-gray-200">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900">
-            <Rocket className="w-5 h-5 text-blue-600" />
-            快速操作
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* 下载 nanobot - 只在未安装时显示 */}
-            {nanobotVersion !== null && !nanobotVersion.installed && (
-              <div className="group relative overflow-hidden rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <button
-                  onClick={handleDownload}
-                  disabled={loading}
-                  className="relative w-full text-left p-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
-                      {loading ? (
-                        <RefreshCw className="w-5 h-5 text-blue-600 animate-spin" />
-                      ) : (
-                        <Download className="w-5 h-5 text-blue-600" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">
-                        {loading ? "正在下载..." : "下载 nanobot"}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {loading ? "请稍候，正在安装 nanobot..." : "通过 pip 安装最新版本"}
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            )}
-
-            {/* 初始化 nanobot - 只在未安装时显示 */}
-            {nanobotVersion !== null && !nanobotVersion.installed && (
-              <div className="group relative overflow-hidden rounded-lg border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all">
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <button
-                  onClick={handleOnboard}
-                  disabled={loading}
-                  className="relative w-full text-left p-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-indigo-50 rounded-lg group-hover:bg-indigo-100 transition-colors">
-                      {loading ? (
-                        <RefreshCw className="w-5 h-5 text-indigo-600 animate-spin" />
-                      ) : (
-                        <Rocket className="w-5 h-5 text-indigo-600" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">
-                        {loading ? "正在初始化..." : "初始化配置"}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {loading ? "请稍候，正在创建配置文件..." : "下载后运行，创建配置文件"}
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            )}
-
-            {/* 启动/停止 nanobot - 合并按钮 */}
-            <div className={`group relative overflow-hidden rounded-lg border transition-all ${
-              status.running
-                ? "border-red-200 hover:border-red-300 hover:shadow-md"
-                : "border-green-200 hover:border-green-300 hover:shadow-md"
-            }`}>
-              <div className={`absolute inset-0 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity ${
-                status.running ? "from-red-50 to-transparent" : "from-green-50 to-transparent"
-              }`}></div>
-              <button
-                onClick={status.running ? handleStop : handleStart}
-                disabled={loading}
-                className="relative w-full text-left p-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg transition-colors ${
-                    status.running
-                      ? "bg-red-50 group-hover:bg-red-100"
-                      : "bg-green-50 group-hover:bg-green-100"
-                  }`}>
-                    {status.running ? (
-                      <Square className="w-5 h-5 text-red-600" />
-                    ) : (
-                      <Play className="w-5 h-5 text-green-600" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">
-                      {status.running ? "停止 nanobot" : "启动 nanobot"}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {status.running
-                        ? `停止服务 (端口 ${status.port || 18790})`
-                        : "启动 nanobot gateway 服务"
-                      }
-                    </p>
-                  </div>
-                  <div className={`ml-4 px-3 py-1 rounded-full text-xs font-medium ${
-                    status.running
-                      ? "bg-red-100 text-red-700"
-                      : "bg-green-100 text-green-700"
-                  }`}>
-                    {status.running ? "运行中" : "已停止"}
-                  </div>
-                </div>
-              </button>
-            </div>
-
-            {/* 重启 nanobot */}
-            <div className="group relative overflow-hidden rounded-lg border border-gray-200 hover:border-amber-300 hover:shadow-md transition-all">
-              <div className="absolute inset-0 bg-gradient-to-r from-amber-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <button
-                onClick={handleRestart}
-                disabled={loading || !status.running}
-                className="relative w-full text-left p-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
-                    <RefreshCw className={`w-5 h-5 text-amber-600 ${loading ? 'animate-spin' : ''}`} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">重启 nanobot</p>
-                    <p className="text-xs text-gray-500 mt-1">停止并重新启动服务</p>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
 
         {/* 系统信息 */}
         <div className="p-6 bg-white rounded-lg border border-gray-200">

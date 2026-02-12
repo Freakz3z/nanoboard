@@ -33,8 +33,15 @@ export const processApi = {
 // Logger API
 export const loggerApi = {
   getLogs: (lines?: number) => invoke<any>("get_logs", { lines }),
+  getStatistics: () => invoke<any>("get_log_statistics"),
   startStream: () => invoke<void>("start_log_stream"),
   stopStream: () => invoke<void>("stop_log_stream"),
+};
+
+// Network API
+export const networkApi = {
+  initMonitor: () => invoke<void>("init_network_monitor"),
+  getStats: () => invoke<any>("get_network_stats"),
 };
 
 // Session API
