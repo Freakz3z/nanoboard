@@ -250,12 +250,6 @@ pub async fn start_log_stream(
             return;
         }
 
-        // 开始监控
-        if let Err(e) = watcher.watch(&log_path_for_watch, RecursiveMode::NonRecursive) {
-            eprintln!("监控日志文件失败: {}", e);
-            return;
-        }
-
         // 同时使用轮询作为备选方案，防止 watcher 漏掉某些事件
         // 减少轮询频率以降低 CPU 使用率（从 500ms 增加到 2000ms）
         loop {

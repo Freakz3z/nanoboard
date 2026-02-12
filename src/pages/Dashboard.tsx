@@ -44,7 +44,7 @@ interface SystemInfo {
     usage_percent: number;
     usage_text: string;
   };
-  disk: {
+  swap: {
     total: number;
     total_text: string;
     used: number;
@@ -510,7 +510,7 @@ export default function Dashboard() {
                       <div key={channelKey} className="flex items-center justify-between">
                         <span className="text-xs text-gray-600 capitalize">{channelKey}</span>
                         <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
-                          {t("dashboard.enabled")}
+                          {t("config.enabled")}
                         </span>
                       </div>
                     ))}
@@ -577,23 +577,23 @@ export default function Dashboard() {
                     {systemInfo.memory.used_text} / {systemInfo.memory.total_text}
                   </p>
                 </div>
-                {/* 磁盘 */}
+                {/* 交换空间 */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-1.5">
                       <Database className="w-3.5 h-3.5 text-purple-600" />
-                      <span className="text-xs text-gray-600">{t("dashboard.disk")}</span>
+                      <span className="text-xs text-gray-600">{t("dashboard.swap")}</span>
                     </div>
-                    <span className="text-xs font-medium text-gray-700">{systemInfo.disk.usage_text}</span>
+                    <span className="text-xs font-medium text-gray-700">{systemInfo.swap.usage_text}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
                     <div
                       className="bg-purple-600 h-1.5 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(systemInfo.disk.usage_percent, 100)}%` }}
+                      style={{ width: `${Math.min(systemInfo.swap.usage_percent, 100)}%` }}
                     />
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    {systemInfo.disk.used_text} / {systemInfo.disk.total_text}
+                    {systemInfo.swap.used_text} / {systemInfo.swap.total_text}
                   </p>
                 </div>
               </div>

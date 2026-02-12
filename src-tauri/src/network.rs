@@ -73,9 +73,37 @@ fn get_network_stats_impl() -> (u64, u64) {
 
 #[cfg(target_os = "windows")]
 fn get_network_stats_impl() -> (u64, u64) {
-    // Windows 上跳过网络监控，避免性能问题
-    // 返回 0 表示未获取到数据
-    (0, 0)
+    use std::os::windows::process::CommandExt;
+
+    // 使用 PowerShell 获取网络统计，使用 CREATE_NO_WINDOW 避免终端弹窗
+    let mut total_received = 0u64;
+    let mut total_transmitted = 0u64;
+
+    // 获取所有网络适配器的统计信息
+    if let Ok(output) = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "Get-NetAdapterStatistics | Select-Object ReceivedBytes,SentBytes"
+        ])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output()
+    {
+        let content = String::from_utf8_lossy(&output.stdout);
+        for line in content.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                if let Ok(rx) = parts[0].parse::<u64>() {
+                    total_received += rx;
+                }
+                if let Ok(tx) = parts[1].parse::<u64>() {
+                    total_transmitted += tx;
+                }
+            }
+        }
+    }
+
+    (total_received, total_transmitted)
 }
 
 pub struct NetworkMonitor {

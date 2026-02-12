@@ -13,52 +13,6 @@ use std::sync::Mutex;
 
 use crate::AppState;
 
-// Windows 上不再需要 windows API 导入
-
-// 缓存磁盘信息，避免频繁调用 PowerShell
-struct DiskInfoCache {
-    data: Option<(u64, u64)>,  // (total, available)
-    last_update: Option<Instant>,
-}
-
-impl DiskInfoCache {
-    fn new() -> Self {
-        Self {
-            data: None,
-            last_update: None,
-        }
-    }
-
-    fn get(&mut self) -> (u64, u64) {
-        const CACHE_DURATION: Duration = Duration::from_secs(5);
-
-        if let Some(last_update) = self.last_update {
-            if last_update.elapsed() < CACHE_DURATION {
-                if let Some(data) = self.data {
-                    return data;
-                }
-            }
-        }
-
-        // 缓存过期或为空，重新获取
-        let data = get_disk_usage();
-        self.data = Some(data);
-        self.last_update = Some(Instant::now());
-        data
-    }
-}
-
-// 全局磁盘信息缓存
-static DISK_CACHE: Mutex<Option<DiskInfoCache>> = Mutex::new(None);
-
-fn get_cached_disk_usage() -> (u64, u64) {
-    let mut cache = DISK_CACHE.lock().unwrap();
-    if cache.is_none() {
-        *cache = Some(DiskInfoCache::new());
-    }
-    cache.as_mut().unwrap().get()
-}
-
 // 进程检查缓存，避免频繁刷新进程列表
 struct ProcessCheckCache {
     is_running: Option<bool>,
@@ -1035,11 +989,12 @@ pub async fn get_system_info() -> Result<serde_json::Value, String> {
         }
     }
 
-    // 获取磁盘使用情况（使用缓存避免频繁调用 PowerShell）
-    let (total_disk, available_disk) = get_cached_disk_usage();
-    let used_disk = total_disk.saturating_sub(available_disk);
-    let disk_usage_percent = if total_disk > 0 {
-        (used_disk as f64 / total_disk as f64) * 100.0
+    // 获取交换空间使用情况
+    let total_swap = sys.total_swap();
+    let used_swap = sys.used_swap();
+    let available_swap = total_swap.saturating_sub(used_swap);
+    let swap_usage_percent = if total_swap > 0 {
+        (used_swap as f64 / total_swap as f64) * 100.0
     } else {
         0.0
     };
@@ -1059,76 +1014,17 @@ pub async fn get_system_info() -> Result<serde_json::Value, String> {
             "usage_percent": memory_usage_percent,
             "usage_text": format!("{:.1}%", memory_usage_percent)
         },
-        "disk": {
-            "total": total_disk,
-            "total_text": format_bytes(total_disk),
-            "used": used_disk,
-            "used_text": format_bytes(used_disk),
-            "available": available_disk,
-            "available_text": format_bytes(available_disk),
-            "usage_percent": disk_usage_percent,
-            "usage_text": format!("{:.1}%", disk_usage_percent)
+        "swap": {
+            "total": total_swap,
+            "total_text": format_bytes(total_swap),
+            "used": used_swap,
+            "used_text": format_bytes(used_swap),
+            "available": available_swap,
+            "available_text": format_bytes(available_swap),
+            "usage_percent": swap_usage_percent,
+            "usage_text": format!("{:.1}%", swap_usage_percent)
         }
     }))
-}
-
-/// 获取磁盘使用情况（平台特定实现）
-#[cfg(target_os = "macos")]
-fn get_disk_usage() -> (u64, u64) {
-    use std::process::Command;
-    // macOS 使用 df 命令获取根分区磁盘信息
-    if let Ok(output) = Command::new("df")
-        .args(["-k", "/"])
-        .output()
-    {
-        let content = String::from_utf8_lossy(&output.stdout);
-        let lines: Vec<&str> = content.lines().collect();
-        // 跳过标题行，读取第一行数据
-        if lines.len() > 1 {
-            if let Some(line) = lines.get(1) {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                // df -k 输出格式：Filesystem 1K-blocks Used Available Capacity
-                // 索引：0=filesystem, 1=total, 2=used, 3=available
-                if parts.len() >= 4 {
-                    let total_kb: u64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
-                    let avail_kb: u64 = parts.get(3).and_then(|s| s.parse().ok()).unwrap_or(0);
-                    return (total_kb * 1024, avail_kb * 1024);
-                }
-            }
-        }
-    }
-    (0, 0)
-}
-
-#[cfg(target_os = "linux")]
-fn get_disk_usage() -> (u64, u64) {
-    use std::fs;
-    // Linux 读取 /proc/meminfo 或使用 df 命令
-    if let Ok(output) = std::process::Command::new("df")
-        .args(["-k", "/"])
-        .output()
-    {
-        let content = String::from_utf8_lossy(&output.stdout);
-        let lines: Vec<&str> = content.lines().collect();
-        if lines.len() > 1 {
-            if let Some(line) = lines.get(1) {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() >= 4 {
-                    let total_kb: u64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
-                    let avail_kb: u64 = parts.get(3).and_then(|s| s.parse().ok()).unwrap_or(0);
-                    return (total_kb * 1024, avail_kb * 1024);
-                }
-            }
-        }
-    }
-    (0, 0)
-}
-
-#[cfg(target_os = "windows")]
-fn get_disk_usage() -> (u64, u64) {
-    // Windows 上跳过磁盘监控，避免性能问题
-    // 返回 0 表示未获取到数据
-    (0, 0)
 }
 
 /// 检查 nanobot 配置是否完整

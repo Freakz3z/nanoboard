@@ -460,9 +460,9 @@ export default function ConfigEditor() {
     }
   }
 
-  function saveProviderAgentConfigs() {
+  function saveProviderAgentConfigs(data?: Record<string, ProviderAgentConfig>) {
     try {
-      localStorage.setItem(PROVIDER_AGENT_CONFIGS_KEY, JSON.stringify(providerAgentConfigs));
+      localStorage.setItem(PROVIDER_AGENT_CONFIGS_KEY, JSON.stringify(data ?? providerAgentConfigs));
     } catch (error) {
       console.error(t("config.saveProviderAgentConfigFailed"), error);
     }
@@ -506,7 +506,7 @@ export default function ConfigEditor() {
       const formatted = JSON.stringify(parsed, null, 2);
       setCode(formatted);
       setCodeError(null);
-      toast.showSuccess(t("logs.codeFormatted"));
+      toast.showSuccess(t("config.codeFormatted"));
     } catch (error) {
       setCodeError(`${t("config.formatFailed")}: ${t("config.jsonSyntaxError")}`);
       toast.showError(`${t("config.formatFailed")}: ${t("config.jsonSyntaxError")}`);
@@ -527,7 +527,7 @@ export default function ConfigEditor() {
       },
     };
     setProviderAgentConfigs(updatedConfig);
-    saveProviderAgentConfigs();
+    saveProviderAgentConfigs(updatedConfig);
   }
 
   async function applyProviderAgentConfig(providerId: string) {
@@ -658,19 +658,6 @@ export default function ConfigEditor() {
     setConfig({ ...config, providers: newProviders });
   }
 
-  function updateAgentDefaults(field: keyof AgentDefaults, value: any) {
-    setConfig({
-      ...config,
-      agents: {
-        ...config.agents,
-        defaults: {
-          ...config.agents?.defaults,
-          [field]: value,
-        },
-      },
-    });
-  }
-
   async function updateChannel(name: string, enabled: boolean) {
     const updatedConfig = {
       ...config,
@@ -729,7 +716,7 @@ export default function ConfigEditor() {
   }
 
   function formatTimestamp(timestamp: number): string {
-    return new Date(timestamp * 1000).toLocaleString("zh-CN");
+    return new Date(timestamp * 1000).toLocaleString(i18n.language === "en" ? "en-US" : "zh-CN");
   }
 
   function formatSize(bytes: number): string {
@@ -794,9 +781,9 @@ export default function ConfigEditor() {
     }
   }
 
-  function saveTemplates() {
+  function saveTemplates(data?: ConfigTemplate[]) {
     try {
-      localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
+      localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(data ?? templates));
     } catch (error) {
       console.error(t("config.saveTemplateFailed"), error);
     }
@@ -825,7 +812,7 @@ export default function ConfigEditor() {
       onConfirm: () => {
         const updated = templates.filter((t) => t.id !== template.id);
         setTemplates(updated);
-        saveTemplates();
+        saveTemplates(updated);
         toast.showSuccess(t("config.templateDeleted"));
         setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => {} });
       },
@@ -848,7 +835,7 @@ export default function ConfigEditor() {
 
     const updated = [...templates, newTemplate];
     setTemplates(updated);
-    saveTemplates();
+    saveTemplates(updated);
     toast.showSuccess(t("config.templateSaved"));
     setTemplateDialog({ isOpen: false, mode: "save", name: "", description: "" });
   }
@@ -1209,113 +1196,6 @@ export default function ConfigEditor() {
           )}
         </div>
 
-        {/* Agents 配置 - 已隐藏，每个提供商现在有自己的 Agent 配置 */}
-        {false && (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <button
-            onClick={() => toggleSection("agents")}
-            className="w-full p-5 flex items-center justify-between hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-50 rounded-lg">
-                <Settings className="w-5 h-5 text-purple-600" />
-              </div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                {t("config.agentConfig")}
-              </h2>
-            </div>
-            {expandedSections.has("agents") ? (
-              <ChevronUp className="w-5 h-5 text-gray-400" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-gray-400" />
-            )}
-          </button>
-
-          {expandedSections.has("agents") && (
-            <div className="p-5 pt-0 space-y-3">
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">
-                  默认模型 (model)
-                </label>
-                <input
-                  type="text"
-                  value={config.agents?.defaults?.model || ""}
-                  onChange={(e) =>
-                    updateAgentDefaults("model", e.target.value)
-                  }
-                  placeholder="例如: anthropic/claude-opus-4-5"
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-                />
-                <p className="text-xs text-gray-500 mt-1">agent 使用的默认 LLM 模型</p>
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">
-                  最大 Token 数 (max_tokens)
-                </label>
-                <input
-                  type="number"
-                  value={config.agents?.defaults?.max_tokens || 8192}
-                  onChange={(e) =>
-                    updateAgentDefaults("max_tokens", parseInt(e.target.value))
-                  }
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-                />
-                <p className="text-xs text-gray-500 mt-1">单次请求的最大 token 数量</p>
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">
-                  最大工具迭代次数 (max_tool_iterations)
-                </label>
-                <input
-                  type="number"
-                  value={config.agents?.defaults?.max_tool_iterations ?? 20}
-                  onChange={(e) =>
-                    updateAgentDefaults("max_tool_iterations", parseInt(e.target.value))
-                  }
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-                />
-                <p className="text-xs text-gray-500 mt-1">agent 执行工具的最大迭代次数</p>
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">
-                  工作区路径 (workspace)
-                </label>
-                <input
-                  type="text"
-                  value={config.agents?.defaults?.workspace || "~/.nanobot/workspace"}
-                  onChange={(e) =>
-                    updateAgentDefaults("workspace", e.target.value)
-                  }
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-                />
-                <p className="text-xs text-gray-500 mt-1">agent 工作区的默认路径</p>
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">
-                  温度 (temperature) (0.0 - 2.0)
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="2"
-                  value={config.agents?.defaults?.temperature ?? 0.7}
-                  onChange={(e) =>
-                    updateAgentDefaults("temperature", parseFloat(e.target.value))
-                  }
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-                />
-                <p className="text-xs text-gray-500 mt-1">控制生成文本的随机性，越高越随机</p>
-              </div>
-            </div>
-          )}
-        </div>
-        )}
-
         {/* Channels 配置 */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <button
@@ -1415,7 +1295,7 @@ export default function ConfigEditor() {
                 <EmptyState
                   icon={Inbox}
                   title={t("config.noChannelsConfigured")}
-                  description={t("config.clickToStartConfig")}
+                  description={t("dashboard.clickToStartConfig")}
                 />
               )}
             </div>

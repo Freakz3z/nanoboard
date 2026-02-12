@@ -45,7 +45,7 @@ export default function Sessions() {
     message: string;
     type: "warning" | "info";
     onConfirm: () => void;
-  }>({ isOpen: false, title: "", message: "", type: "warning", onConfirm: () => () => {} });
+  }>({ isOpen: false, title: "", message: "", type: "warning", onConfirm: () => {} });
 
   // 创建文件夹对话框
   const [createFolderDialog, setCreateFolderDialog] = useState<{

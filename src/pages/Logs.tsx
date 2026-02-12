@@ -295,10 +295,10 @@ export default function Logs() {
           }
           (window as any).__logUnlisten = null;
         }
-        toast.showInfo("日志监控已停止");
+        toast.showInfo(t("logs.stopMonitoring"));
       } catch (error) {
-        console.error("停止监控失败:", error);
-        toast.showError("停止监控失败");
+        console.error("Stop monitoring failed:", error);
+        toast.showError(t("logs.stopMonitoringFailed"));
       }
     } else {
       try {
@@ -516,7 +516,7 @@ export default function Logs() {
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className="text-blue-600 font-medium">INFO</span>
                     <span className="text-gray-600">
-                      {statistics.info} 条 ({statistics.infoPercent.toFixed(1)}%)
+                      {statistics.info} {t("dashboard.entries")} ({statistics.infoPercent.toFixed(1)}%)
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -532,7 +532,7 @@ export default function Logs() {
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className="text-gray-600 font-medium">DEBUG</span>
                     <span className="text-gray-600">
-                      {statistics.debug} 条 ({statistics.debugPercent.toFixed(1)}%)
+                      {statistics.debug} {t("dashboard.entries")} ({statistics.debugPercent.toFixed(1)}%)
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -548,7 +548,7 @@ export default function Logs() {
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className="text-amber-600 font-medium">WARN</span>
                     <span className="text-gray-600">
-                      {statistics.warn} 条 ({statistics.warnPercent.toFixed(1)}%)
+                      {statistics.warn} {t("dashboard.entries")} ({statistics.warnPercent.toFixed(1)}%)
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -564,7 +564,7 @@ export default function Logs() {
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className="text-red-600 font-medium">ERROR</span>
                     <span className="text-gray-600">
-                      {statistics.error} 条 ({statistics.errorPercent.toFixed(1)}%)
+                      {statistics.error} {t("dashboard.entries")} ({statistics.errorPercent.toFixed(1)}%)
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
