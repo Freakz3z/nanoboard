@@ -32,24 +32,24 @@
 <table>
   <tr>
     <td align="center">
-      <img src="public/screenshots/dashboard.png" alt="仪表盘" width="400"/>
+      <img src="public/screenshots/dashboard.png" alt="仪表盘"/>
       <br/>
       监控状态·系统资源
     </td>
     <td align="center">
-      <img src="public/screenshots/logs.png" alt="日志监控" width="400"/>
+      <img src="public/screenshots/logs.png" alt="日志监控"/>
       <br/>
       实时查看·过滤应用日志
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="public/screenshots/file-manager.png" alt="文件管理" width="400"/>
+      <img src="public/screenshots/file-manager.png" alt="文件管理"/>
       <br/>
       查看会话·管理文件
     </td>
     <td align="center">
-      <img src="public/screenshots/config.png" alt="配置编辑器" width="400"/>
+      <img src="public/screenshots/config.png" alt="配置编辑器"/>
       <br/>
       可视化配置·快速编辑
     </td>
@@ -62,14 +62,14 @@
 
 在 [Release](https://github.com/Freakz3z/nanoboard/releases) 页面下载最新版本的安装包：
 
-### macOS
+### macOS **约 5 MB**
 
 - **Apple Silicon (ARM64)**: 适用于 M1/M2/M3 等 Apple 芯片 Mac
-- **Intel x64**: 适用于 Intel 芯片 Mac
+- **Intel x64**: 适用于 Intel 芯片 Mac 
 
-### Windows
+### Windows **约 3 MB**
 
-- 下载 `.exe` 安装程序
+- **x64-setup**: 适用于 64 位 Windows 系统 
 
 ### Linux（开发中）
 

@@ -32,24 +32,24 @@ English | **[简体中文](README.md)**
 <table>
   <tr>
     <td align="center">
-      <img src="public/screenshots/dashboard.png" alt="Dashboard" width="400"/>
+      <img src="public/screenshots/dashboard.png" alt="Dashboard"/>
       <br/>
       Status Monitoring·System Resources
     </td>
     <td align="center">
-      <img src="public/screenshots/logs.png" alt="Log Monitor" width="400"/>
+      <img src="public/screenshots/logs.png" alt="Log Monitor"/>
       <br/>
       Real-time Viewing·Log Filtering
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="public/screenshots/file-manager.png" alt="File Manager" width="400"/>
+      <img src="public/screenshots/file-manager.png" alt="File Manager"/>
       <br/>
       View Sessions·Manage Files
     </td>
     <td align="center">
-      <img src="public/screenshots/config.png" alt="Config Editor" width="400"/>
+      <img src="public/screenshots/config.png" alt="Config Editor"/>
       <br/>
       Visual Config·Quick Edit
     </td>
@@ -62,14 +62,14 @@ English | **[简体中文](README.md)**
 
 Download the latest installation package from the [Release](https://github.com/Freakz3z/nanoboard/releases) page:
 
-### macOS
+### macOS **～ 5 MB**
 
 - **Apple Silicon (ARM64)**: For Macs with M1/M2/M3 or later Apple chips
 - **Intel x64**: For Macs with Intel chips
 
-### Windows
+### Windows **～ 3 MB**
 
-- Download the `.exe` installer
+- **x64-setup**: For 64-bit Windows systems
 
 ### Linux (Coming Soon)
 
