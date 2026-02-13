@@ -62,12 +62,12 @@ English | **[简体中文](README.md)**
 
 Download the latest installation package from the [Release](https://github.com/Freakz3z/nanoboard/releases) page:
 
-### macOS **～ 5 MB**
+### macOS
 
 - **Apple Silicon (ARM64)**: For Macs with M1/M2/M3 or later Apple chips
 - **Intel x64**: For Macs with Intel chips
 
-### Windows **～ 3 MB**
+### Windows
 
 - **x64-setup**: For 64-bit Windows systems
 
