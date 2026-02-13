@@ -267,6 +267,8 @@
     "restoreDefaultFailed": "Failed to restore default config",
     "autoSaveFailed": "Auto save config failed",
     "unsaved": "Unsaved",
+    "unsavedChanges": "Unsaved Changes",
+    "unsavedChangesMsg": "You have unsaved changes. Switching views will discard these changes. Continue?",
     "formatCode": "Format",
     "codeFormatted": "Code formatted",
     "applyTemplate": "Apply this template",

@@ -439,7 +439,11 @@ export default function ConfigEditor() {
         toast.showError(result.message);
         setConfig({});
       } else {
-        setConfig(result as Config);
+        const loadedConfig = result as Config;
+        setConfig(loadedConfig);
+        // 同步更新代码编辑器状态
+        setOriginalConfig(loadedConfig);
+        setCode(JSON.stringify(loadedConfig, null, 2));
         }
     } catch (error) {
       toast.showError(t("config.loadConfigFailed"));
@@ -484,6 +488,8 @@ export default function ConfigEditor() {
       await configApi.save(parsed);
       setOriginalConfig(parsed);
       setConfig(parsed as Config);
+      // 更新代码状态为保存后的内容
+      setCode(JSON.stringify(parsed, null, 2));
       toast.showSuccess(t("config.saveSuccess"));
     } catch (error) {
       if (typeof error === "object" && error !== null && "message" in error) {
@@ -557,6 +563,9 @@ export default function ConfigEditor() {
     try {
       const configToSave = cleanConfigForSave(updatedConfig);
       await configApi.save(configToSave);
+      // 同步更新代码编辑器状态
+      setOriginalConfig(updatedConfig);
+      setCode(JSON.stringify(updatedConfig, null, 2));
     } catch (error) {
       toast.showError(t("config.autoSaveFailed"));
     }
@@ -647,15 +656,30 @@ export default function ConfigEditor() {
     try {
       const configToSave = cleanConfigForSave(updatedConfig);
       await configApi.save(configToSave);
+      // 同步更新代码编辑器状态
+      setOriginalConfig(updatedConfig);
+      setCode(JSON.stringify(updatedConfig, null, 2));
     } catch (error) {
       toast.showError(t("config.autoSaveFailed"));
     }
   }
 
-  function removeProvider(name: string) {
+  async function removeProvider(name: string) {
     const newProviders = { ...config.providers };
     delete newProviders[name];
-    setConfig({ ...config, providers: newProviders });
+    const updatedConfig = { ...config, providers: newProviders };
+    setConfig(updatedConfig);
+
+    // 自动保存
+    try {
+      const configToSave = cleanConfigForSave(updatedConfig);
+      await configApi.save(configToSave);
+      // 同步更新代码编辑器状态
+      setOriginalConfig(updatedConfig);
+      setCode(JSON.stringify(updatedConfig, null, 2));
+    } catch (error) {
+      toast.showError(t("config.autoSaveFailed"));
+    }
   }
 
   async function updateChannel(name: string, enabled: boolean) {
@@ -675,6 +699,9 @@ export default function ConfigEditor() {
     try {
       const configToSave = cleanConfigForSave(updatedConfig);
       await configApi.save(configToSave);
+      // 同步更新代码编辑器状态
+      setOriginalConfig(updatedConfig);
+      setCode(JSON.stringify(updatedConfig, null, 2));
     } catch (error) {
       toast.showError(t("config.autoSaveFailed"));
     }
@@ -698,6 +725,9 @@ export default function ConfigEditor() {
     try {
       const configToSave = cleanConfigForSave(updatedConfig);
       await configApi.save(configToSave);
+      // 同步更新代码编辑器状态
+      setOriginalConfig(updatedConfig);
+      setCode(JSON.stringify(updatedConfig, null, 2));
     } catch (error) {
       toast.showError(t("config.autoSaveFailed"));
     }
@@ -800,6 +830,9 @@ export default function ConfigEditor() {
 
   function applyTemplate(template: ConfigTemplate) {
     setConfig(template.config);
+    // 同步更新代码编辑器状态
+    setOriginalConfig(template.config);
+    setCode(JSON.stringify(template.config, null, 2));
     toast.showSuccess(t("config.templateLoaded", { name: template.name }));
     setShowTemplates(false);
   }
@@ -857,7 +890,7 @@ export default function ConfigEditor() {
             <h1 className="text-xl font-semibold text-gray-900">{t("config.title")}</h1>
             <div className="flex gap-2">
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (viewMode === "visual") {
                     // 切换到代码模式，加载当前配置
                     setOriginalConfig(config);
@@ -865,8 +898,21 @@ export default function ConfigEditor() {
                     setCodeError(null);
                     setViewMode("code");
                   } else {
-                    // 切换回可视模式
-                    setViewMode("visual");
+                    // 切换回可视模式前，检查是否有未保存的修改
+                    if (code !== JSON.stringify(originalConfig, null, 2)) {
+                      setConfirmDialog({
+                        isOpen: true,
+                        title: t("config.unsavedChanges"),
+                        message: t("config.unsavedChangesMsg"),
+                        onConfirm: async () => {
+                          // 用户选择放弃修改，直接切换
+                          setViewMode("visual");
+                          setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+                        },
+                      });
+                    } else {
+                      setViewMode("visual");
+                    }
                   }
                 }}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-colors text-sm ${

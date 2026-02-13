@@ -267,6 +267,8 @@
     "restoreDefaultFailed": "恢复默认配置失败",
     "autoSaveFailed": "自动保存配置失败",
     "unsaved": "未保存",
+    "unsavedChanges": "未保存的更改",
+    "unsavedChangesMsg": "您有未保存的更改。切换视图将丢失这些更改，是否继续？",
     "formatCode": "格式化",
     "codeFormatted": "代码已格式化",
     "applyTemplate": "应用此模板",
