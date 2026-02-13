@@ -62,16 +62,14 @@ English | **[简体中文](README.md)**
 
 Download the latest installation package from the [Release](https://github.com/Freakz3z/nanoboard/releases) page:
 
-### macOS
-
-- **Apple Silicon (ARM64)**: For Macs with M1/M2/M3 or later Apple chips
-- **Intel x64**: For Macs with Intel chips
-
-### Windows
-
-- **x64-setup**: For 64-bit Windows systems
-
-### Linux (Coming Soon)
+| Platform          | Architecture | Artifact        |
+| --------------- | ----- | -------------- |
+| Windows x64     | x64   | NSIS exe       |
+| Windows aarch64 | ARM64 | NSIS exe       |
+| MacOS x64       | x64   | dmg            |
+| MacOS aarch64   | ARM64 | dmg            |
+| Linux x64       | x64   | deb + AppImage |
+| Linux aarch64   | ARM64 | deb + AppImage |
 
 ## Tech Stack
 
