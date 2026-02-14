@@ -34,7 +34,12 @@
     "language": "Language",
     "switchLanguage": "Switch Language",
     "chinese": "中文",
-    "english": "English"
+    "english": "English",
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode",
+    "collapse": "Collapse",
+    "expandSidebar": "Expand Sidebar",
+    "collapseSidebar": "Collapse Sidebar"
   },
   "dashboard": {
     "systemStatus": "System Status",

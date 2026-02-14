@@ -44,7 +44,10 @@
     "chinese": "中文",
     "english": "English",
     "darkMode": "暗色模式",
-    "lightMode": "亮色模式"
+    "lightMode": "亮色模式",
+    "collapse": "收起",
+    "expandSidebar": "展开侧边栏",
+    "collapseSidebar": "收起侧边栏"
   },
   "dashboard": {
     "systemStatus": "系统状态",
