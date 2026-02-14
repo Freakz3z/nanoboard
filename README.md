@@ -64,8 +64,8 @@
 
 | 平台              | 架构  | 产物             |
 | --------------- | ----- | -------------- |
-| Windows x64     | x64   | NSIS exe       |
-| Windows aarch64 | ARM64 | NSIS exe       |
+| Windows x64     | x64   | exe       |
+| Windows aarch64 | ARM64 | exe       |
 | MacOS x64       | x64   | dmg            |
 | MacOS aarch64   | ARM64 | dmg            |
 | Linux x64       | x64   | deb + AppImage |
@@ -131,27 +131,52 @@ npm run tauri:build
 nanoboard/
 ├── src/                    # React 前端源码
 │   ├── components/         # 可复用组件
-│   │   ├── Layout.tsx              # 主布局组件
-│   │   ├── ConfirmDialog.tsx       # 确认对话框
-│   │   ├── EmptyState.tsx          # 空状态提示
-│   │   ├── Toast.tsx               # 消息提示
-│   │   ├── NetworkMonitor.tsx      # 网络监控图表
-│   │   └── KeyboardShortcutsHelp.tsx  # 快捷键帮助
+│   │   ├── index.ts               # 组件统一导出
+│   │   ├── Layout.tsx             # 主布局组件
+│   │   ├── ConfirmDialog.tsx      # 确认对话框
+│   │   ├── EmptyState.tsx         # 空状态提示
+│   │   ├── Toast.tsx              # 消息提示
+│   │   ├── NetworkMonitor.tsx     # 网络监控图表
+│   │   ├── ErrorBoundary.tsx      # 错误边界
+│   │   ├── KeyboardShortcutsHelp.tsx  # 快捷键帮助
+│   │   ├── config/                # 配置相关组件
+│   │   │   ├── ProviderEditModal.tsx  # Provider 编辑模态框
+│   │   │   ├── ChannelEditModal.tsx   # Channel 编辑模态框
+│   │   │   ├── HistoryPanel.tsx       # 历史记录面板
+│   │   │   └── CodeEditorView.tsx     # 代码编辑视图
+│   │   └── dashboard/             # 仪表盘相关组件
+│   │       ├── StatusCards.tsx        # 状态卡片组
+│   │       ├── ConfigOverviewCards.tsx # 配置概览卡片
+│   │       ├── SystemResourceCards.tsx # 系统资源卡片
+│   │       └── SystemInfoSection.tsx  # 系统信息区域
 │   ├── pages/             # 页面组件
-│   │   ├── Dashboard.tsx           # 仪表盘
-│   │   ├── ConfigEditor.tsx        # 配置编辑器
-│   │   ├── CodeEditor.tsx          # 代码编辑器
-│   │   ├── Logs.tsx                # 日志监控
-│   │   └── Sessions.tsx            # 会话管理
+│   │   ├── Dashboard.tsx          # 仪表盘
+│   │   ├── ConfigEditor.tsx       # 配置编辑器
+│   │   ├── Logs.tsx               # 日志监控
+│   │   └── FileManager.tsx        # 文件管理
+│   ├── config/            # 配置类型和数据
+│   │   ├── index.ts               # 统一导出
+│   │   ├── types.ts               # 配置类型定义
+│   │   ├── providers.ts           # Provider 配置数据
+│   │   └── channels.ts            # Channel 配置数据
+│   ├── types/             # 类型定义
+│   │   ├── index.ts               # 通用类型
+│   │   └── dashboard.ts           # 仪表盘类型
 │   ├── lib/               # 工具函数
 │   │   ├── tauri.ts               # Tauri API 封装
-│   │   └── defaultConfig.ts       # 默认配置
+│   │   ├── defaultConfig.ts       # 默认配置
+│   │   └── utils.ts               # 通用工具函数
+│   ├── utils/             # 工具函数
+│   │   └── format.ts              # 格式化工具
+│   ├── contexts/          # React Context
+│   │   ├── ToastContext.tsx       # Toast 上下文
+│   │   └── ThemeContext.tsx       # 主题上下文
+│   ├── hooks/             # 自定义 Hooks
+│   │   └── useKeyboardShortcuts.ts # 快捷键 Hook
 │   ├── i18n/              # 国际化配置
 │   │   └── locales/
 │   │       ├── zh-CN.json         # 简体中文
 │   │       └── en-US.json         # 英文
-│   ├── contexts/          # React Context
-│   ├── hooks/             # 自定义 Hooks
 │   ├── assets/            # 静态资源
 │   ├── App.tsx            # 主应用组件
 │   └── main.tsx           # 应用入口

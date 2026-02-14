@@ -67,20 +67,6 @@ export default function FileManager() {
 
   const toast = useToast();
 
-  // Nanobot 自带的受保护文件/文件夹列表
-  const protectedItems = [
-    "memory",
-    "skills",
-    "AGENTS.md",
-    "SOUL.md",
-    "USER.md",
-  ];
-
-  // 检查是否为受保护项
-  function isProtectedItem(itemName: string): boolean {
-    return protectedItems.includes(itemName);
-  }
-
   useEffect(() => {
     loadDirectory("");
   }, []);
@@ -424,11 +410,6 @@ export default function FileManager() {
                       <h3 className="font-medium text-gray-900 dark:text-dark-text-primary truncate text-sm">
                         {item.name}
                       </h3>
-                      {isProtectedItem(item.name) && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 flex-shrink-0">
-                          {t("sessions.protected")}
-                        </span>
-                      )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-dark-text-muted mt-0.5">
                       {item.type === "file" && (
@@ -441,30 +422,26 @@ export default function FileManager() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {!isProtectedItem(item.name) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          renameItem(item);
-                        }}
-                        className="p-1.5 text-gray-400 dark:text-dark-text-muted hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
-                        title={t("sessions.rename")}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                    )}
-                    {!isProtectedItem(item.name) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteItem(item);
-                        }}
-                        className="p-1.5 text-gray-400 dark:text-dark-text-muted hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-all"
-                        title={t("sessions.delete")}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        renameItem(item);
+                      }}
+                      className="p-1.5 text-gray-400 dark:text-dark-text-muted hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
+                      title={t("sessions.rename")}
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteItem(item);
+                      }}
+                      className="p-1.5 text-gray-400 dark:text-dark-text-muted hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-all"
+                      title={t("sessions.delete")}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               ))

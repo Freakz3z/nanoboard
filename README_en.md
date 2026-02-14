@@ -64,8 +64,8 @@ Download the latest installation package from the [Release](https://github.com/F
 
 | Platform          | Architecture | Artifact        |
 | --------------- | ----- | -------------- |
-| Windows x64     | x64   | NSIS exe       |
-| Windows aarch64 | ARM64 | NSIS exe       |
+| Windows x64     | x64   | exe       |
+| Windows aarch64 | ARM64 | exe       |
 | MacOS x64       | x64   | dmg            |
 | MacOS aarch64   | ARM64 | dmg            |
 | Linux x64       | x64   | deb + AppImage |
@@ -131,27 +131,52 @@ npm run tauri:build
 nanoboard/
 ├── src/                    # React frontend source
 │   ├── components/         # Reusable components
-│   │   ├── Layout.tsx              # Main layout component
-│   │   ├── ConfirmDialog.tsx       # Confirmation dialog
-│   │   ├── EmptyState.tsx          # Empty state hint
-│   │   ├── Toast.tsx               # Toast notification
-│   │   ├── NetworkMonitor.tsx      # Network monitoring chart
-│   │   └── KeyboardShortcutsHelp.tsx  # Keyboard shortcuts help
+│   │   ├── index.ts               # Component exports
+│   │   ├── Layout.tsx             # Main layout component
+│   │   ├── ConfirmDialog.tsx      # Confirmation dialog
+│   │   ├── EmptyState.tsx         # Empty state hint
+│   │   ├── Toast.tsx              # Toast notification
+│   │   ├── NetworkMonitor.tsx     # Network monitoring chart
+│   │   ├── ErrorBoundary.tsx      # Error boundary
+│   │   ├── KeyboardShortcutsHelp.tsx  # Keyboard shortcuts help
+│   │   ├── config/                # Config-related components
+│   │   │   ├── ProviderEditModal.tsx  # Provider edit modal
+│   │   │   ├── ChannelEditModal.tsx   # Channel edit modal
+│   │   │   ├── HistoryPanel.tsx       # History panel
+│   │   │   └── CodeEditorView.tsx     # Code editor view
+│   │   └── dashboard/             # Dashboard components
+│   │       ├── StatusCards.tsx        # Status cards
+│   │       ├── ConfigOverviewCards.tsx # Config overview cards
+│   │       ├── SystemResourceCards.tsx # System resource cards
+│   │       └── SystemInfoSection.tsx  # System info section
 │   ├── pages/             # Page components
-│   │   ├── Dashboard.tsx           # Dashboard
-│   │   ├── ConfigEditor.tsx        # Config editor
-│   │   ├── CodeEditor.tsx          # Code editor
-│   │   ├── Logs.tsx                # Log monitor
-│   │   └── Sessions.tsx            # Session manager
+│   │   ├── Dashboard.tsx          # Dashboard
+│   │   ├── ConfigEditor.tsx       # Config editor
+│   │   ├── Logs.tsx               # Log monitor
+│   │   └── FileManager.tsx        # File manager
+│   ├── config/            # Config types and data
+│   │   ├── index.ts               # Exports
+│   │   ├── types.ts               # Config type definitions
+│   │   ├── providers.ts           # Provider config data
+│   │   └── channels.ts            # Channel config data
+│   ├── types/             # Type definitions
+│   │   ├── index.ts               # Common types
+│   │   └── dashboard.ts           # Dashboard types
 │   ├── lib/               # Utility functions
 │   │   ├── tauri.ts               # Tauri API wrapper
-│   │   └── defaultConfig.ts       # Default config
+│   │   ├── defaultConfig.ts       # Default config
+│   │   └── utils.ts               # Utility functions
+│   ├── utils/             # Utility functions
+│   │   └── format.ts              # Format utilities
+│   ├── contexts/          # React Context
+│   │   ├── ToastContext.tsx       # Toast context
+│   │   └── ThemeContext.tsx       # Theme context
+│   ├── hooks/             # Custom Hooks
+│   │   └── useKeyboardShortcuts.ts # Keyboard shortcuts hook
 │   ├── i18n/              # Internationalization
 │   │   └── locales/
 │   │       ├── zh-CN.json         # Simplified Chinese
 │   │       └── en-US.json         # English
-│   ├── contexts/          # React Context
-│   ├── hooks/             # Custom Hooks
 │   ├── assets/            # Static assets
 │   ├── App.tsx            # Main app component
 │   └── main.tsx           # App entry

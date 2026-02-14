@@ -1079,10 +1079,56 @@ pub async fn check_nanobot_config() -> Result<serde_json::Value, String> {
     }))
 }
 
+/// 通过 pip show 获取包版本（使用 shell 继承用户环境变量）
+fn get_version_via_pip(package: &str) -> Option<String> {
+    let pip_cmd = format!("pip show {}", package);
+
+    // macOS: 使用 zsh 登录 shell 加载用户配置
+    #[cfg(target_os = "macos")]
+    let output = Command::new("/bin/zsh")
+        .args(["-l", "-c", &pip_cmd])
+        .output()
+        .ok()?;
+
+    // Linux: 使用 bash 登录 shell
+    #[cfg(target_os = "linux")]
+    let output = Command::new("/bin/bash")
+        .args(["-l", "-c", &pip_cmd])
+        .output()
+        .ok()?;
+
+    // Windows: 使用 PowerShell
+    #[cfg(windows)]
+    let output = Command::new("powershell")
+        .args(["-Command", &pip_cmd])
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            if line.starts_with("Version:") {
+                let version = line.trim_start_matches("Version:").trim();
+                return Some(version.to_string());
+            }
+        }
+    }
+    None
+}
+
 /// 获取nanobot版本信息
 #[tauri::command]
 pub async fn get_nanobot_version() -> Result<serde_json::Value, String> {
-    // 查找 nanobot 命令
+    // 优先使用 pip show 获取版本（更准确）
+    if let Some(version) = get_version_via_pip("nanobot-ai") {
+        return Ok(json!({
+            "installed": true,
+            "version": version,
+            "message": format!("nanobot {}", version)
+        }));
+    }
+
+    // 备选方案：通过 nanobot --version 获取
     let nanobot_cmd = match find_command("nanobot") {
         Some(cmd) => cmd,
         None => {
