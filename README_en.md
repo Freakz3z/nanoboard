@@ -29,52 +29,52 @@ English | **[简体中文](README.md)**
 
 <table>
   <tr>
-    <td align="center">
-      Dashboard<img src="public/screenshots/dashboard.png" alt="Dashboard" width="400"/>
-      <br/>
-      Status Monitoring·System Resources
-    </td>
-    <td align="center">
-      Sessions<img src="public/screenshots/sessions.png" alt="Sessions" width="400"/>
-      <br/>
-      Multi-channel·Markdown Rendering
-    </td>
+    <td align="center"><b>Dashboard</b></td>
+    <td align="center"><b>Sessions</b></td>
   </tr>
   <tr>
-    <td align="center">
-      Logs<img src="public/screenshots/logs.png" alt="Logs" width="400"/>
-      <br/>
-      Real-time Viewing·Log Filtering
-    </td>
-    <td align="center">
-      Workspace<img src="public/screenshots/workspace.png" alt="Workspace" width="400"/>
-      <br/>
-      View Sessions·Manage Files
-    </td>
+    <td align="center"><img src="public/screenshots/dashboard.png" alt="Dashboard" width="400"/></td>
+    <td align="center"><img src="public/screenshots/sessions.png" alt="Sessions" width="400"/></td>
   </tr>
   <tr>
-    <td align="center">
-      Skills<img src="public/screenshots/skills.png" alt="Skills" width="400"/>
-      <br/>
-      Visual Management·One-Click Toggle
-    </td>
-    <td align="center">
-      Memory<img src="public/screenshots/memory.png" alt="Memory" width="400"/>
-      <br/>
-      Memory Management·Edit & Delete
-    </td>
+    <td align="center">Status Monitoring·System Resources</td>
+    <td align="center">Multi-channel·Markdown Rendering</td>
   </tr>
   <tr>
-    <td align="center">
-      Cron<img src="public/screenshots/cron.png" alt="Cron" width="400"/>
-      <br/>
-      Scheduled Cron Jobs·Auto Execution
-    </td>
-    <td align="center">
-      Settings<img src="public/screenshots/settings.png" alt="Settings" width="400"/>
-      <br/>
-      Visual Config·Quick Edit
-    </td>
+    <td align="center"><b>Logs</b></td>
+    <td align="center"><b>Workspace</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="public/screenshots/logs.png" alt="Logs" width="400"/></td>
+    <td align="center"><img src="public/screenshots/workspace.png" alt="Workspace" width="400"/></td>
+  </tr>
+  <tr>
+    <td align="center">Real-time Viewing·Log Filtering</td>
+    <td align="center">View Sessions·Manage Files</td>
+  </tr>
+  <tr>
+    <td align="center"><b>Skills</b></td>
+    <td align="center"><b>Memory</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="public/screenshots/skills.png" alt="Skills" width="400"/></td>
+    <td align="center"><img src="public/screenshots/memory.png" alt="Memory" width="400"/></td>
+  </tr>
+  <tr>
+    <td align="center">Visual Management·One-Click Toggle</td>
+    <td align="center">Memory Management·Edit & Delete</td>
+  </tr>
+  <tr>
+    <td align="center"><b>Cron</b></td>
+    <td align="center"><b>Settings</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="public/screenshots/cron.png" alt="Cron" width="400"/></td>
+    <td align="center"><img src="public/screenshots/settings.png" alt="Settings" width="400"/></td>
+  </tr>
+  <tr>
+    <td align="center">Scheduled Cron Jobs·Auto Execution</td>
+    <td align="center">Visual Config·Quick Edit</td>
   </tr>
 </table>
 

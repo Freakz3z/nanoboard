@@ -29,52 +29,52 @@
 
 <table>
   <tr>
-    <td align="center">
-      仪表盘<img src="public/screenshots/dashboard.png" alt="仪表盘" width="400"/>
-      <br/>
-      监控状态·系统资源
-    </td>
-    <td align="center">
-      会话<img src="public/screenshots/sessions.png" alt="会话" width="400"/>
-      <br/>
-      多渠道会话·Markdown渲染
-    </td>
+    <td align="center"><b>仪表盘</b></td>
+    <td align="center"><b>会话</b></td>
   </tr>
   <tr>
-    <td align="center">
-      日志<img src="public/screenshots/logs.png" alt="日志" width="400"/>
-      <br/>
-      实时查看·过滤日志
-    </td>
-    <td align="center">
-      工作区<img src="public/screenshots/workspace.png" alt="工作区" width="400"/>
-      <br/>
-      查看会话·管理文件
-    </td>
+    <td align="center"><img src="public/screenshots/dashboard.png" alt="仪表盘" width="400"/></td>
+    <td align="center"><img src="public/screenshots/sessions.png" alt="会话" width="400"/></td>
   </tr>
   <tr>
-    <td align="center">
-      技能<img src="public/screenshots/skills.png" alt="技能" width="400"/>
-      <br/>
-      可视化管理·一键开关
-    </td>
-    <td align="center">
-      记忆<img src="public/screenshots/memory.png" alt="记忆" width="400"/>
-      <br/>
-      记忆管理·编辑删除
-    </td>
+    <td align="center">监控状态·系统资源</td>
+    <td align="center">多渠道会话·Markdown渲染</td>
   </tr>
   <tr>
-    <td align="center">
-      定时任务<img src="public/screenshots/cron.png" alt="定时任务" width="400"/>
-      <br/>
-      定时任务·自动执行
-    </td>
-    <td align="center">
-      设置<img src="public/screenshots/settings.png" alt="设置" width="400"/>
-      <br/>
-      可视化配置·快速编辑
-    </td>
+    <td align="center"><b>日志</b></td>
+    <td align="center"><b>工作区</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="public/screenshots/logs.png" alt="日志" width="400"/></td>
+    <td align="center"><img src="public/screenshots/workspace.png" alt="工作区" width="400"/></td>
+  </tr>
+  <tr>
+    <td align="center">实时查看·过滤日志</td>
+    <td align="center">查看会话·管理文件</td>
+  </tr>
+  <tr>
+    <td align="center"><b>技能</b></td>
+    <td align="center"><b>记忆</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="public/screenshots/skills.png" alt="技能" width="400"/></td>
+    <td align="center"><img src="public/screenshots/memory.png" alt="记忆" width="400"/></td>
+  </tr>
+  <tr>
+    <td align="center">可视化管理·一键开关</td>
+    <td align="center">记忆管理·编辑删除</td>
+  </tr>
+  <tr>
+    <td align="center"><b>定时任务</b></td>
+    <td align="center"><b>设置</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="public/screenshots/cron.png" alt="定时任务" width="400"/></td>
+    <td align="center"><img src="public/screenshots/settings.png" alt="设置" width="400"/></td>
+  </tr>
+  <tr>
+    <td align="center">定时任务·自动执行</td>
+    <td align="center">可视化配置·快速编辑</td>
   </tr>
 </table>
 
