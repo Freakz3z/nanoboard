@@ -12,6 +12,7 @@ import FileManager from "./pages/FileManager";
 import Skills from "./pages/Skills";
 import Memory from "./pages/Memory";
 import CronJobs from "./pages/CronJobs";
+import Sessions from "./pages/Sessions";
 import { ContextMenu } from "./components/ContextMenu";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -81,6 +82,7 @@ function AppContent() {
           <Route path="/files" element={<FileManager />} />
           <Route path="/skills" element={<Skills />} />
           <Route path="/memory" element={<Memory />} />
+          <Route path="/sessions" element={<Sessions />} />
           <Route path="/cron" element={<CronJobs />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

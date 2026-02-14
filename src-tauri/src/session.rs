@@ -943,3 +943,144 @@ pub async fn delete_file(relative_path: String) -> Result<serde_json::Value, Str
         "message": format!("文件 {} 已删除", relative_path)
     }))
 }
+
+/// 获取 chat sessions 路径
+fn get_chat_sessions_path() -> Result<PathBuf> {
+    let home = home_dir().context("无法找到用户主目录")?;
+    let sessions_path = home.join(".nanobot").join("sessions");
+    Ok(sessions_path)
+}
+
+/// 列出所有聊天会话
+#[tauri::command]
+pub async fn list_chat_sessions() -> Result<serde_json::Value, String> {
+    let sessions_path = get_chat_sessions_path().map_err(|e| e.to_string())?;
+
+    if !sessions_path.exists() {
+        return Ok(json!({
+            "sessions": [],
+            "message": "sessions目录不存在"
+        }));
+    }
+
+    let mut sessions = Vec::new();
+
+    // 读取 sessions 目录中的所有 .jsonl 文件
+    if let Ok(entries) = fs::read_dir(&sessions_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                    if file_name.ends_with(".jsonl") {
+                        // 读取文件元数据
+                        if let Ok(metadata) = fs::metadata(&path) {
+                            if let Ok(modified) = metadata.modified() {
+                                // 尝试读取第一行获取会话标题
+                                let title = if let Ok(content) = fs::read_to_string(&path) {
+                                    content
+                                        .lines()
+                                        .next()
+                                        .and_then(|line| {
+                                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                                                json.get("content")
+                                                    .and_then(|c| c.as_str())
+                                                    .map(|s| {
+                                                        // 截取前50个字符作为预览
+                                                        let preview: String = s.chars().take(50).collect();
+                                                        if s.len() > 50 { format!("{}...", preview) } else { preview }
+                                                    })
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                        .unwrap_or_else(|| file_name.to_string())
+                                } else {
+                                    file_name.to_string()
+                                };
+
+                                sessions.push(json!({
+                                    "id": file_name,
+                                    "name": file_name.trim_end_matches(".jsonl"),
+                                    "title": title,
+                                    "path": path.to_string_lossy(),
+                                    "modified": modified.duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap_or_default()
+                                        .as_secs(),
+                                    "size": metadata.len()
+                                }));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 按修改时间倒序排列
+    sessions.sort_by(|a, b| {
+        let a_time = a["modified"].as_u64().unwrap_or(0);
+        let b_time = b["modified"].as_u64().unwrap_or(0);
+        b_time.cmp(&a_time)
+    });
+
+    Ok(json!({
+        "sessions": sessions,
+        "total": sessions.len()
+    }))
+}
+
+/// 获取聊天会话内容并返回结构化消息数据
+#[tauri::command]
+pub async fn get_chat_session_content(session_id: String) -> Result<serde_json::Value, String> {
+    let sessions_path = get_chat_sessions_path().map_err(|e| e.to_string())?;
+    let session_path = sessions_path.join(&session_id);
+
+    if !session_path.exists() {
+        return Ok(json!({
+            "success": false,
+            "message": format!("会话 {} 不存在", session_id)
+        }));
+    }
+
+    let content = fs::read_to_string(&session_path)
+        .map_err(|e| format!("读取会话失败: {}", e))?;
+
+    // 将 JSONL 转换为结构化消息数组
+    let mut messages = Vec::new();
+
+    for line in content.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+            // 只处理有效的消息（有 role 字段且内容非空）
+            if let Some(role) = json.get("role").and_then(|r| r.as_str()) {
+                let msg_content = json.get("content").and_then(|c| c.as_str()).unwrap_or("");
+
+                // 跳过空内容的消息
+                if !msg_content.trim().is_empty() {
+                    messages.push(json!({
+                        "role": role,
+                        "content": msg_content
+                    }));
+                }
+            }
+        }
+    }
+
+    let metadata = fs::metadata(&session_path)
+        .map_err(|e| format!("读取会话元数据失败: {}", e))?;
+
+    Ok(json!({
+        "success": true,
+        "id": session_id,
+        "name": session_id.trim_end_matches(".jsonl"),
+        "messages": messages,
+        "raw_content": content,
+        "size": metadata.len(),
+        "modified": metadata.modified()
+            .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs())
+            .unwrap_or(0)
+    }))
+}

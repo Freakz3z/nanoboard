@@ -17,6 +17,7 @@ import {
   CalendarClock,
   ChevronLeft,
   ChevronRight,
+  MessageSquare,
 } from "lucide-react";
 import { processApi } from "../lib/tauri";
 import { useToast } from "../contexts/ToastContext";
@@ -51,8 +52,9 @@ export default function Layout({ children }: LayoutProps) {
 
   const navItems = [
     { path: "/", label: t("nav.dashboard"), icon: LayoutDashboard },
+    { path: "/sessions", label: t("nav.chatSessions"), icon: MessageSquare },
     { path: "/logs", label: t("nav.logs"), icon: ScrollText },
-    { path: "/files", label: t("nav.sessions"), icon: FileText },
+    { path: "/files", label: t("nav.files"), icon: FileText },
     { path: "/skills", label: t("nav.skills"), icon: Wrench },
     { path: "/memory", label: t("nav.memory"), icon: Brain },
     { path: "/cron", label: t("nav.cron"), icon: CalendarClock },
@@ -169,7 +171,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className={`border-b border-gray-200 dark:border-dark-border-subtle ${collapsed ? "p-3" : "p-6"}`}>
             <div className={`flex flex-col items-center ${collapsed ? "gap-0" : "gap-3"}`}>
               {/* Logo 统一浅灰色背景 */}
-              <div className={`${collapsed ? "p-1.5" : "p-3"} bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl shadow-sm transition-all duration-200`}>
+              <div className={`${collapsed ? "p-2" : "p-3"} bg-gradient-to-br from-gray-50 to-gray-100 ${collapsed ? "rounded-xl" : "rounded-2xl"} shadow-sm transition-all duration-200`}>
                 <img
                   src="/assets/logo.png"
                   alt={t("layout.logoAlt")}

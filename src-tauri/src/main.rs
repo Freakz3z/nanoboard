@@ -100,6 +100,9 @@ async fn main() {
             session::delete_folder,
             session::delete_file,
             session::rename_item,
+            // Chat session commands
+            session::list_chat_sessions,
+            session::get_chat_session_content,
             // Theme commands
             theme::get_theme,
             theme::set_theme,

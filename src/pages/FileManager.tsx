@@ -80,10 +80,10 @@ export default function FileManager() {
         setSelectedItem(null);
         setFileContent("");
       } else {
-        toast.showError(result.message || t("sessions.loadDirectoryFailed"));
+        toast.showError(result.message || t("files.loadDirectoryFailed"));
       }
     } catch (error) {
-      toast.showError(t("sessions.loadDirectoryFailed"));
+      toast.showError(t("files.loadDirectoryFailed"));
     }
   }
 
@@ -96,16 +96,16 @@ export default function FileManager() {
         setFileContent(result.content || "");
         setSelectedItem(item);
       } else {
-        toast.showError(result.message || t("sessions.loadFileContentFailed"));
+        toast.showError(result.message || t("files.loadFileContentFailed"));
       }
     } catch (error) {
-      toast.showError(t("sessions.loadFileContentFailed"));
+      toast.showError(t("files.loadFileContentFailed"));
     }
   }
 
   async function createFolder() {
     if (!createFolderDialog.folderName.trim()) {
-      toast.showError(t("sessions.enterFolderName"));
+      toast.showError(t("files.enterFolderName"));
       return;
     }
 
@@ -115,14 +115,14 @@ export default function FileManager() {
         createFolderDialog.folderName.trim()
       );
       if (result.success) {
-        toast.showSuccess(result.message || t("sessions.createFolderSuccess"));
+        toast.showSuccess(result.message || t("files.createFolderSuccess"));
         setCreateFolderDialog({ isOpen: false, folderName: "" });
         await loadDirectory(currentPath);
       } else {
-        toast.showError(result.message || t("sessions.createFolderFailed"));
+        toast.showError(result.message || t("files.createFolderFailed"));
       }
     } catch (error) {
-      toast.showError(t("sessions.createFolderFailed"));
+      toast.showError(t("files.createFolderFailed"));
     }
   }
 
@@ -130,10 +130,10 @@ export default function FileManager() {
     const isFile = item.type === "file";
     setConfirmDialog({
       isOpen: true,
-      title: isFile ? t("sessions.deleteFile") : t("sessions.deleteFolder"),
+      title: isFile ? t("files.deleteFile") : t("files.deleteFolder"),
       message: isFile
-        ? t("sessions.deleteFileConfirm", { name: item.name })
-        : t("sessions.deleteFolderConfirm", { name: item.name }),
+        ? t("files.deleteFileConfirm", { name: item.name })
+        : t("files.deleteFolderConfirm", { name: item.name }),
       type: "warning",
       onConfirm: async () => {
         try {
@@ -142,17 +142,17 @@ export default function FileManager() {
             : await fsApi.deleteFolder(item.relative_path);
 
           if (result.success) {
-            toast.showSuccess(result.message || t("sessions.deleted"));
+            toast.showSuccess(result.message || t("files.deleted"));
             if (selectedItem?.relative_path === item.relative_path) {
               setSelectedItem(null);
               setFileContent("");
             }
             await loadDirectory(currentPath);
           } else {
-            toast.showError(result.message || t("sessions.deleteFailed"));
+            toast.showError(result.message || t("files.deleteFailed"));
           }
         } catch (error) {
-          toast.showError(isFile ? t("sessions.deleteFileFailed") : t("sessions.deleteFolderFailed"));
+          toast.showError(isFile ? t("files.deleteFileFailed") : t("files.deleteFolderFailed"));
         } finally {
           setConfirmDialog({
             isOpen: false,
@@ -176,7 +176,7 @@ export default function FileManager() {
 
   async function confirmRename() {
     if (!renameDialog.item || !renameDialog.newName.trim()) {
-      toast.showError(t("sessions.enterNewName"));
+      toast.showError(t("files.enterNewName"));
       return;
     }
 
@@ -186,14 +186,14 @@ export default function FileManager() {
         renameDialog.newName.trim()
       );
       if (result.success) {
-        toast.showSuccess(result.message || t("sessions.renameSuccess"));
+        toast.showSuccess(result.message || t("files.renameSuccess"));
         setRenameDialog({ isOpen: false, item: null, newName: "" });
         await loadDirectory(currentPath);
       } else {
-        toast.showError(result.message || t("sessions.renameFailed"));
+        toast.showError(result.message || t("files.renameFailed"));
       }
     } catch (error) {
-      toast.showError(t("sessions.renameFailed"));
+      toast.showError(t("files.renameFailed"));
     }
   }
 
@@ -211,19 +211,19 @@ export default function FileManager() {
         if (content) {
           const result = await sessionApi.saveWorkspaceFile(file.name, content);
           if (result.success) {
-            toast.showSuccess(t("sessions.uploadSuccess"));
+            toast.showSuccess(t("files.uploadSuccess"));
             await loadDirectory(currentPath);
           } else {
-            toast.showError(result.message || t("sessions.uploadFailed"));
+            toast.showError(result.message || t("files.uploadFailed"));
           }
         }
       };
       reader.onerror = () => {
-        toast.showError(t("sessions.uploadFailed"));
+        toast.showError(t("files.uploadFailed"));
       };
       reader.readAsText(file);
     } catch (error) {
-      toast.showError(t("sessions.uploadFailed"));
+      toast.showError(t("files.uploadFailed"));
     } finally {
       setUploadingFile(false);
       // 重置文件输入
@@ -234,7 +234,7 @@ export default function FileManager() {
   }
 
   function formatTimestamp(timestamp: number): string {
-    if (!timestamp) return t("sessions.unknown");
+    if (!timestamp) return t("files.unknown");
     const date = new Date(timestamp * 1000);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -244,13 +244,13 @@ export default function FileManager() {
       const hours = Math.floor(diff / (1000 * 60 * 60));
       if (hours === 0) {
         const minutes = Math.floor(diff / (1000 * 60));
-        return minutes <= 1 ? t("sessions.justNow") : t("sessions.minutesAgo", { count: minutes });
+        return minutes <= 1 ? t("files.justNow") : t("files.minutesAgo", { count: minutes });
       }
-      return t("sessions.hoursAgo", { count: hours });
+      return t("files.hoursAgo", { count: hours });
     } else if (days === 1) {
-      return t("sessions.yesterday");
+      return t("files.yesterday");
     } else if (days < 7) {
-      return t("sessions.daysAgo", { count: days });
+      return t("files.daysAgo", { count: days });
     } else {
       return date.toLocaleDateString(i18n.language === "en" ? "en-US" : "zh-CN");
     }
@@ -291,72 +291,67 @@ export default function FileManager() {
     <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-dark-bg-base transition-colors duration-200">
       {/* 页面头部 */}
       <div className="border-b border-gray-200 dark:border-dark-border-subtle bg-white dark:bg-dark-bg-card flex-shrink-0 transition-colors duration-200">
-        {/* 标题栏 */}
-        <div className="px-6 py-4">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-dark-text-primary">{t("sessions.title")}</h1>
-        </div>
-
-        {/* 面包屑导航和搜索栏 */}
-        <div className="px-6 pb-4">
+        <div className="px-6 py-4 flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-dark-text-primary">{t("files.title")}</h1>
           <div className="flex items-center gap-4">
-            {/* 面包屑导航 */}
-            <div className="flex items-center gap-1 text-sm flex-1">
-              <button
-                onClick={() => loadDirectory("")}
-                className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
-                  !currentPath || currentPath === "/"
-                    ? "text-gray-900 dark:text-dark-text-primary font-medium"
-                    : "text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-bg-hover"
-                }`}
-              >
-                <Home className="w-4 h-4" />
-                {t("sessions.workspace")}
-              </button>
-              {getBreadcrumbs().map((crumb, index) => (
-                <div key={crumb.path} className="flex items-center gap-1">
-                  <ChevronRight className="w-4 h-4 text-gray-400 dark:text-dark-text-muted" />
-                  <button
-                    onClick={() => loadDirectory(crumb.path)}
-                    className={`px-2 py-1 rounded transition-colors ${
-                      index === getBreadcrumbs().length - 1
-                        ? "text-gray-900 dark:text-dark-text-primary font-medium"
-                        : "text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-bg-hover"
-                    }`}
-                  >
-                    {crumb.name}
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* 搜索框和上传按钮 */}
-            <div className="relative w-64 flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-dark-text-muted" />
-                <input
-                  type="text"
-                  placeholder={t("sessions.searchPlaceholder")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white dark:bg-dark-bg-sidebar text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted transition-colors duration-200"
-                />
-              </div>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingFile}
-                className="p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-dark-bg-active disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                title={t("sessions.uploadFile")}
-              >
-                <Upload className={`w-4 h-4 ${uploadingFile ? 'animate-pulse' : ''}`} />
-              </button>
+            {/* 上传按钮 */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingFile}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-dark-bg-active disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-medium"
+            >
+              <Upload className={`w-4 h-4 ${uploadingFile ? 'animate-pulse' : ''}`} />
+              {t("files.uploadFile")}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileUpload}
+              className="hidden"
+              accept=".txt,.md,.json,.js,.ts,.py,.yaml,.yml"
+            />
+            {/* 搜索框 */}
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-dark-text-muted" />
               <input
-                ref={fileInputRef}
-                type="file"
-                onChange={handleFileUpload}
-                className="hidden"
-                accept=".txt,.md,.json,.js,.ts,.py,.yaml,.yml"
+                type="text"
+                placeholder={t("files.searchPlaceholder")}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white dark:bg-dark-bg-sidebar text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted transition-colors duration-200"
               />
             </div>
+          </div>
+        </div>
+        {/* 面包屑导航 */}
+        <div className="px-6 pb-4">
+          <div className="flex items-center gap-1 text-sm">
+            <button
+              onClick={() => loadDirectory("")}
+              className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
+                !currentPath || currentPath === "/"
+                  ? "text-gray-900 dark:text-dark-text-primary font-medium"
+                  : "text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-bg-hover"
+              }`}
+            >
+              <Home className="w-4 h-4" />
+              {t("files.workspace")}
+            </button>
+            {getBreadcrumbs().map((crumb, index) => (
+              <div key={crumb.path} className="flex items-center gap-1">
+                <ChevronRight className="w-4 h-4 text-gray-400 dark:text-dark-text-muted" />
+                <button
+                  onClick={() => loadDirectory(crumb.path)}
+                  className={`px-2 py-1 rounded transition-colors ${
+                    index === getBreadcrumbs().length - 1
+                      ? "text-gray-900 dark:text-dark-text-primary font-medium"
+                      : "text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-bg-hover"
+                  }`}
+                >
+                  {crumb.name}
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -373,12 +368,12 @@ export default function FileManager() {
               <EmptyState
                 icon={searchQuery ? Search : HardDrive}
                 title={
-                  searchQuery ? t("sessions.noMatchingFiles") : t("sessions.noFiles")
+                  searchQuery ? t("files.noMatchingFiles") : t("files.noFiles")
                 }
                 description={
                   searchQuery
-                    ? t("sessions.tryOtherKeywords")
-                    : t("sessions.noFilesDesc")
+                    ? t("files.tryOtherKeywords")
+                    : t("files.noFilesDesc")
                 }
               />
             ) : (
@@ -428,7 +423,7 @@ export default function FileManager() {
                         renameItem(item);
                       }}
                       className="p-1.5 text-gray-400 dark:text-dark-text-muted hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
-                      title={t("sessions.rename")}
+                      title={t("files.rename")}
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
@@ -438,7 +433,7 @@ export default function FileManager() {
                         deleteItem(item);
                       }}
                       className="p-1.5 text-gray-400 dark:text-dark-text-muted hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-all"
-                      title={t("sessions.delete")}
+                      title={t("files.delete")}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -493,8 +488,8 @@ export default function FileManager() {
             <div className="flex-1 flex items-center justify-center">
               <EmptyState
                 icon={FileText}
-                title={t("sessions.selectFile")}
-                description={t("sessions.selectFileDesc")}
+                title={t("files.selectFile")}
+                description={t("files.selectFileDesc")}
               />
             </div>
           )}
@@ -506,10 +501,10 @@ export default function FileManager() {
       {createFolderDialog.isOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-dark-bg-card rounded-lg p-6 w-full max-w-md transition-colors duration-200">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary mb-4">{t("sessions.createFolder")}</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary mb-4">{t("files.createFolder")}</h3>
             <input
               type="text"
-              placeholder={t("sessions.folderName")}
+              placeholder={t("files.folderName")}
               value={createFolderDialog.folderName}
               onChange={(e) =>
                 setCreateFolderDialog({
@@ -540,7 +535,7 @@ export default function FileManager() {
                 onClick={createFolder}
                 className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors"
               >
-                {t("sessions.createFolder")}
+                {t("files.createFolder")}
               </button>
             </div>
           </div>
@@ -552,11 +547,11 @@ export default function FileManager() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-dark-bg-card rounded-lg p-6 w-full max-w-md transition-colors duration-200">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary mb-4">
-              {renameDialog.item?.type === "directory" ? t("sessions.renameFolder") : t("sessions.renameFile")}
+              {renameDialog.item?.type === "directory" ? t("files.renameFolder") : t("files.renameFile")}
             </h3>
             <input
               type="text"
-              placeholder={t("sessions.newName")}
+              placeholder={t("files.newName")}
               value={renameDialog.newName}
               onChange={(e) =>
                 setRenameDialog({

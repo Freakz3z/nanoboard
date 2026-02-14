@@ -78,6 +78,12 @@ export const sessionApi = {
   saveWorkspaceFile: (fileName: string, content: string) => invoke<OperationResult>("save_workspace_file", { fileName, content }),
 };
 
+// Chat Session API
+export const chatSessionApi = {
+  list: () => invoke<AnyResponse>("list_chat_sessions"),
+  getContent: (sessionId: string) => invoke<AnyResponse>("get_chat_session_content", { sessionId }),
+};
+
 // Skill API
 export const skillApi = {
   list: () => invoke<SkillListResult>("list_skills"),

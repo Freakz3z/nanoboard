@@ -288,6 +288,14 @@ export default function Skills() {
             {t("skills.title")}
           </h1>
           <div className="flex items-center gap-4">
+            {/* 新建按钮 */}
+            <button
+              onClick={startNewSkill}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              {t("skills.newSkill")}
+            </button>
             {/* 搜索框 */}
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-dark-text-muted" />
@@ -299,14 +307,6 @@ export default function Skills() {
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white dark:bg-dark-bg-sidebar text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted transition-colors duration-200"
               />
             </div>
-            {/* 新建按钮 */}
-            <button
-              onClick={startNewSkill}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              {t("skills.newSkill")}
-            </button>
           </div>
         </div>
       </div>
