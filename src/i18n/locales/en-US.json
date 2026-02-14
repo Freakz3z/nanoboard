@@ -347,19 +347,7 @@
     "templateTitle": "Save Config Template",
     "templateTitlePlaceholder": "e.g., OpenAI config, Dev environment config",
     "templateDescLabel": "Description (optional)",
-    "templateDescPlaceholder": "Describe the purpose of this template...",
-    "keyboardShortcuts": {
-      "title": "Keyboard Shortcuts",
-      "save": "Save",
-      "refresh": "refresh",
-      "search": "search",
-      "newTab": "New Tab",
-      "closeTab": "Close Tab",
-      "dashboard": "Dashboard",
-      "config": "Config",
-      "logs": "Logs",
-      "sessions": "Sessions"
-    }
+    "templateDescPlaceholder": "Describe the purpose of this template..."
   },
   "sessions": {
     "title": "File Manager",
@@ -499,18 +487,6 @@
     "warning": "Warning",
     "info": "Info"
   },
-  "keyboardShortcuts": {
-    "title": "Keyboard Shortcuts",
-    "save": "Save",
-    "refresh": "Refresh",
-    "search": "Search",
-    "newTab": "New Tab",
-    "closeTab": "Close Tab",
-    "dashboard": "Dashboard",
-    "config": "Config",
-    "logs": "Logs",
-    "sessions": "Sessions"
-  },
   "language": {
     "title": "Language",
     "switch": "Switch Language",
@@ -623,6 +599,7 @@
     "runOnceAt": "Will run once at {{time}}",
     "selectTime": "Please select a time",
     "deliverHint": "To deliver results to a messaging channel, chat with Nanobot in that channel and ask it to set the channel and chat_id in jobs.json",
+    "restartHint": "You may need to restart nanobot for job changes to take effect",
     "enable": "Enable",
     "disable": "Disable",
     "enabled": "Enabled",

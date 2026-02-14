@@ -16,6 +16,7 @@ import {
   PowerOff,
   Send,
   Pencil,
+  AlertTriangle,
 } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -380,6 +381,16 @@ export default function CronJobs() {
 
       {/* 任务列表 */}
       <div className="flex-1 min-h-0 overflow-y-auto p-6 scrollbar-thin">
+        {/* 重启提示 */}
+        <div className="max-w-4xl mx-auto mb-4">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-lg">
+            <AlertTriangle className="w-4 h-4 text-amber-500 dark:text-amber-400 flex-shrink-0" />
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              {t("cron.restartHint")}
+            </p>
+          </div>
+        </div>
+
         {isLoading ? (
           <div className="flex items-center justify-center h-48">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

@@ -358,19 +358,7 @@
     "templateTitle": "保存配置模板",
     "templateTitlePlaceholder": "例如: OpenAI 配置、开发环境配置",
     "templateDescLabel": "描述（可选）",
-    "templateDescPlaceholder": "描述此模板的用途...",
-    "keyboardShortcuts": {
-      "title": "键盘快捷键",
-      "save": "保存",
-      "refresh": "刷新",
-      "search": "搜索",
-      "newTab": "新建标签",
-      "closeTab": "关闭标签",
-      "dashboard": "仪表盘",
-      "config": "配置",
-      "logs": "日志",
-      "sessions": "会话"
-    }
+    "templateDescPlaceholder": "描述此模板的用途..."
   },
   "sessions": {
     "title": "文件管理",
@@ -510,18 +498,6 @@
     "warning": "警告",
     "info": "信息"
   },
-  "keyboardShortcuts": {
-    "title": "键盘快捷键",
-    "save": "保存",
-    "refresh": "刷新",
-    "search": "搜索",
-    "newTab": "新建标签",
-    "closeTab": "关闭标签",
-    "dashboard": "仪表盘",
-    "config": "配置",
-    "logs": "日志",
-    "sessions": "会话"
-  },
   "language": {
     "title": "语言",
     "switch": "切换语言",
@@ -624,6 +600,7 @@
     "runOnceAt": "将在 {{time}} 执行一次",
     "selectTime": "请选择执行时间",
     "deliverHint": "如需将结果投递到消息频道，请在消息渠道中与 Nanobot 对话，让其设置 jobs.json 中的 channel 与 chat_id",
+    "restartHint": "Jobs 配置完成后可能需要重启 nanobot 才能生效",
     "enable": "启用",
     "disable": "禁用",
     "enabled": "已启用",

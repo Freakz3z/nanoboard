@@ -9,15 +9,18 @@ pub fn build_menu(app: &AppHandle) -> Menu<Wry> {
     let refresh_config = MenuItem::with_id(app, "refresh_config", "Refresh Config 刷新配置", true, None::<&str>).unwrap();
     let export_config = MenuItem::with_id(app, "export_config", "Export Config 导出配置", true, None::<&str>).unwrap();
     let preferences = MenuItem::new(app, "Preferences... 偏好设置...", true, None::<&str>).unwrap();
-    let quit = MenuItem::new(app, "Quit 退出", true, Some("CmdOrControl+Q")).unwrap();
+    let quit = PredefinedMenuItem::quit(app, Some("Quit 退出")).unwrap();
     let file_menu = Submenu::with_items(app, "File 文件", true, &[&refresh_config, &export_config, &preferences, &quit]).unwrap();
 
     // 编辑菜单
-    let cut = MenuItem::new(app, "Cut 剪切", true, Some("CmdOrControl+X")).unwrap();
-    let copy = MenuItem::new(app, "Copy 复制", true, Some("CmdOrControl+C")).unwrap();
-    let paste = MenuItem::new(app, "Paste 粘贴", true, Some("CmdOrControl+V")).unwrap();
-    let select_all = MenuItem::new(app, "Select All 全选", true, Some("CmdOrControl+A")).unwrap();
-    let edit_menu = Submenu::with_items(app, "Edit 编辑", true, &[&cut, &copy, &paste, &select_all]).unwrap();
+    let undo = PredefinedMenuItem::undo(app, Some("Undo 撤销")).unwrap();
+    let redo = PredefinedMenuItem::redo(app, Some("Redo 重做")).unwrap();
+    let separator_edit = PredefinedMenuItem::separator(app).unwrap();
+    let cut = PredefinedMenuItem::cut(app, Some("Cut 剪切")).unwrap();
+    let copy = PredefinedMenuItem::copy(app, Some("Copy 复制")).unwrap();
+    let paste = PredefinedMenuItem::paste(app, Some("Paste 粘贴")).unwrap();
+    let select_all = PredefinedMenuItem::select_all(app, Some("Select All 全选")).unwrap();
+    let edit_menu = Submenu::with_items(app, "Edit 编辑", true, &[&undo, &redo, &separator_edit, &cut, &copy, &paste, &select_all]).unwrap();
 
     // 视图菜单
     let dashboard = MenuItem::with_id(app, "view_dashboard", "Dashboard 仪表盘", true, None::<&str>).unwrap();

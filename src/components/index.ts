@@ -7,7 +7,6 @@ export { default as ConfirmDialog } from "./ConfirmDialog";
 export { ContextMenu } from "./ContextMenu";
 export { default as EmptyState } from "./EmptyState";
 export { default as ErrorBoundary } from "./ErrorBoundary";
-export { default as KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
 export { default as Layout } from "./Layout";
 export { default as NetworkMonitor } from "./NetworkMonitor";
 export { default as Toast } from "./Toast";

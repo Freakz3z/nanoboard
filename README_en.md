@@ -50,6 +50,18 @@ English | **[简体中文](README.md)**
       View Sessions·Manage Files
     </td>
     <td align="center">
+      <img src="public/screenshots/skills.png" alt="Skills"/>
+      <br/>
+      Visual Management·One-Click Toggle
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="public/screenshots/cron-jobs.png" alt="Cron Jobs"/>
+      <br/>
+      Scheduled Tasks·Auto Execution
+    </td>
+    <td align="center">
       <img src="public/screenshots/config.png" alt="Config Editor"/>
       <br/>
       Visual Config·Quick Edit
@@ -139,7 +151,6 @@ nanoboard/
 │   │   ├── Toast.tsx              # Toast notification
 │   │   ├── NetworkMonitor.tsx     # Network monitoring chart
 │   │   ├── ErrorBoundary.tsx      # Error boundary
-│   │   ├── KeyboardShortcutsHelp.tsx  # Keyboard shortcuts help
 │   │   ├── config/                # Config-related components
 │   │   │   ├── ProviderEditModal.tsx  # Provider edit modal
 │   │   │   ├── ChannelEditModal.tsx   # Channel edit modal
@@ -173,7 +184,6 @@ nanoboard/
 │   │   ├── ToastContext.tsx       # Toast context
 │   │   └── ThemeContext.tsx       # Theme context
 │   ├── hooks/             # Custom Hooks
-│   │   └── useKeyboardShortcuts.ts # Keyboard shortcuts hook
 │   ├── i18n/              # Internationalization
 │   │   └── locales/
 │   │       ├── zh-CN.json         # Simplified Chinese
@@ -208,6 +218,7 @@ nanoboard/
 - [x] Multi-language support (i18n)
 - [x] Performance monitoring charts
 - [x] Dark theme
+- [ ] Session management
 - [ ] Auto-update feature
 
 ## Acknowledgments

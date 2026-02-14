@@ -50,6 +50,18 @@
       查看会话·管理文件
     </td>
     <td align="center">
+      <img src="public/screenshots/skills.png" alt="技能管理"/>
+      <br/>
+      可视化管理·一键开关
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="public/screenshots/cron-jobs.png" alt="定时任务"/>
+      <br/>
+      定时任务·自动执行
+    </td>
+    <td align="center">
       <img src="public/screenshots/config.png" alt="配置编辑器"/>
       <br/>
       可视化配置·快速编辑
@@ -139,7 +151,6 @@ nanoboard/
 │   │   ├── Toast.tsx              # 消息提示
 │   │   ├── NetworkMonitor.tsx     # 网络监控图表
 │   │   ├── ErrorBoundary.tsx      # 错误边界
-│   │   ├── KeyboardShortcutsHelp.tsx  # 快捷键帮助
 │   │   ├── config/                # 配置相关组件
 │   │   │   ├── ProviderEditModal.tsx  # Provider 编辑模态框
 │   │   │   ├── ChannelEditModal.tsx   # Channel 编辑模态框
@@ -173,7 +184,6 @@ nanoboard/
 │   │   ├── ToastContext.tsx       # Toast 上下文
 │   │   └── ThemeContext.tsx       # 主题上下文
 │   ├── hooks/             # 自定义 Hooks
-│   │   └── useKeyboardShortcuts.ts # 快捷键 Hook
 │   ├── i18n/              # 国际化配置
 │   │   └── locales/
 │   │       ├── zh-CN.json         # 简体中文
@@ -208,6 +218,7 @@ nanoboard/
 - [x] 多语言支持（i18n）
 - [x] 性能监控图表
 - [x] 暗色主题
+- [ ] 会话管理
 - [ ] 自动更新功能
 
 ## 致谢

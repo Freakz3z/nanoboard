@@ -1181,6 +1181,7 @@ export default function ConfigEditor() {
         config={config}
         providerAgentConfig={getProviderAgentConfig(editingProvider.providerId)}
         onClose={() => setEditingProvider({ isOpen: false, providerId: "", providerInfo: null, activeTab: "api" })}
+        onSave={() => applyProviderAgentConfig(editingProvider.providerId)}
         onTabChange={(tab) => setEditingProvider({ ...editingProvider, activeTab: tab })}
         onUpdateProvider={updateProvider}
         onRemoveProvider={removeProvider}
