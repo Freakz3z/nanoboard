@@ -302,9 +302,8 @@ pub async fn stop_log_stream(
     }
 }
 
-/// 获取日志统计信息
-#[tauri::command]
-pub async fn get_log_statistics() -> Result<serde_json::Value, String> {
+/// 获取日志统计信息（内部函数，不需要 #[tauri::command]）
+pub fn get_log_statistics_internal() -> Result<serde_json::Value, String> {
     let log_path = get_log_path().map_err(|e| e.to_string())?;
 
     if !log_path.exists() {
@@ -353,4 +352,10 @@ pub async fn get_log_statistics() -> Result<serde_json::Value, String> {
         "warn": warn,
         "error": error,
     }))
+}
+
+/// 获取日志统计信息
+#[tauri::command]
+pub async fn get_log_statistics() -> Result<serde_json::Value, String> {
+    get_log_statistics_internal()
 }

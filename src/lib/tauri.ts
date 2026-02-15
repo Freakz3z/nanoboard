@@ -43,6 +43,7 @@ export const processApi = {
   start: (port?: number) => invoke<ProcessStartResult>("start_nanobot", { port }),
   stop: () => invoke<ProcessStopResult>("stop_nanobot"),
   getStatus: () => invoke<ProcessStatus>("get_status"),
+  getDashboardData: () => invoke<AnyResponse>("get_dashboard_data"),
   download: () => invoke<DownloadResult>("download_nanobot"),
   downloadWithUv: () => invoke<DownloadResult>("download_nanobot_with_uv"),
   onboard: () => invoke<DownloadResult>("onboard_nanobot"),

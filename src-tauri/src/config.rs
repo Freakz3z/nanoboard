@@ -96,9 +96,8 @@ fn cleanup_old_backups(keep_count: usize) -> Result<()> {
     Ok(())
 }
 
-/// 加载配置文件
-#[tauri::command]
-pub async fn load_config(state: State<'_, AppState>) -> Result<JsonValue, String> {
+/// 加载配置文件（内部函数，不需要 State）
+pub fn load_config_internal() -> Result<JsonValue, String> {
     let config_path = get_config_path_internal().map_err(|e| e.to_string())?;
 
     if !config_path.exists() {
@@ -114,7 +113,16 @@ pub async fn load_config(state: State<'_, AppState>) -> Result<JsonValue, String
     let config: JsonValue = serde_json::from_str(&content)
         .map_err(|e| format!("解析配置文件失败: {}", e))?;
 
+    Ok(config)
+}
+
+/// 加载配置文件
+#[tauri::command]
+pub async fn load_config(state: State<'_, AppState>) -> Result<JsonValue, String> {
+    let config = load_config_internal()?;
+
     // 保存配置路径到状态
+    let config_path = get_config_path_internal().map_err(|e| e.to_string())?;
     *state.config_path.lock().unwrap() = Some(config_path.to_string_lossy().to_string());
 
     Ok(config)

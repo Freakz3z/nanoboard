@@ -63,6 +63,7 @@ async fn main() {
             process::start_nanobot,
             process::stop_nanobot,
             process::get_status,
+            process::get_dashboard_data,
             process::download_nanobot,
             process::download_nanobot_with_uv,
             process::onboard_nanobot,

@@ -54,11 +54,41 @@ impl ProcessCheckCache {
 static PROCESS_CACHE: Mutex<Option<ProcessCheckCache>> = Mutex::new(None);
 
 fn get_cached_nanobot_status() -> bool {
-    let mut cache = PROCESS_CACHE.lock().unwrap();
+    // 使用 lock().unwrap_or_else() 处理 poison 情况
+    // 如果锁被 poison（之前的线程 panic），我们恢复并重新创建缓存
+    let mut cache = PROCESS_CACHE.lock().unwrap_or_else(|e| {
+        log::warn!("进程缓存锁被 poison，正在恢复: {}", e);
+        e.into_inner()
+    });
     if cache.is_none() {
         *cache = Some(ProcessCheckCache::new());
     }
     cache.as_mut().unwrap().get()
+}
+
+fn invalidate_cache() {
+    let mut cache = PROCESS_CACHE.lock().unwrap_or_else(|e| {
+        log::warn!("进程缓存锁被 poison，正在恢复: {}", e);
+        e.into_inner()
+    });
+    if let Some(c) = cache.as_mut() {
+        c.invalidate();
+    }
+}
+
+/// 检查缓存是否过期（超过 1 秒），如果过期则使其失效
+fn invalidate_cache_if_expired() {
+    let mut cache = PROCESS_CACHE.lock().unwrap_or_else(|e| {
+        log::warn!("进程缓存锁被 poison，正在恢复: {}", e);
+        e.into_inner()
+    });
+    if let Some(c) = cache.as_mut() {
+        if let Some(last_update) = c.last_update {
+            if last_update.elapsed() > Duration::from_secs(1) {
+                c.invalidate();
+            }
+        }
+    }
 }
 
 /// 为命令设置隐藏窗口（仅 Windows）
@@ -374,12 +404,7 @@ pub async fn start_nanobot(port: Option<u16>, state: State<'_, AppState>) -> Res
     let port = port.unwrap_or(18790);
 
     // 使缓存失效，重新检查状态
-    {
-        let mut cache = PROCESS_CACHE.lock().unwrap();
-        if let Some(c) = cache.as_mut() {
-            c.invalidate();
-        }
-    }
+    invalidate_cache();
 
     // 检查是否已经在运行
     if check_nanobot_running() {
@@ -447,13 +472,18 @@ pub async fn start_nanobot(port: Option<u16>, state: State<'_, AppState>) -> Res
         .open(&log_path)
         .map_err(|e| format!("无法打开日志文件: {}", e))?;
 
-    // 启动 nanobot gateway，先捕获 stderr 以便调试
+    // 记录启动前的日志文件大小，用于后续读取新产生的日志
+    let log_size_before = log_path.metadata()
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    // 启动 nanobot gateway，直接将 stdout 和 stderr 都重定向到日志文件
     let mut child = match apply_hidden_window(Command::new(&nanobot_cmd))
         .args(["gateway", "--port", &port.to_string()])
         .env("PYTHONUTF8", "1")
         .env("PYTHONIOENCODING", "utf-8")
-        .stdout(Stdio::from(log_file.try_clone().unwrap()))
-        .stderr(Stdio::piped())  // 先用 piped 捕获错误信息
+        .stdout(Stdio::from(log_file.try_clone().map_err(|e| format!("复制文件句柄失败: {}", e))?))
+        .stderr(Stdio::from(log_file))
         .spawn()
     {
         Ok(c) => c,
@@ -467,101 +497,106 @@ pub async fn start_nanobot(port: Option<u16>, state: State<'_, AppState>) -> Res
 
     // 获取进程ID
     let id = child.id();
+    log::info!("Nanobot进程已启动 (PID: {})，等待初始化...", id);
 
-    // 等待一小段时间让进程启动
-    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    // 等待进程初始化（从 2 秒减少到 1.5 秒，因为不需要重启了）
+    tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
 
-    // 立即检查进程是否还在运行
+    // 检查进程状态
     match child.try_wait() {
         Ok(Some(status)) => {
-            // 进程已经退出，尝试读取错误信息
-            let stderr = if let Some(mut stderr) = child.stderr {
-                let mut error_buf = Vec::new();
-                use std::io::Read;
-                let _ = stderr.read_to_end(&mut error_buf);
-                String::from_utf8_lossy(&error_buf).to_string()
-            } else {
-                String::from("无法获取错误信息")
-            };
+            // 进程已经退出，从日志文件读取错误信息
+            let error_msg = read_new_log_content(&log_path, log_size_before);
 
             return Ok(json!({
                 "status": "failed",
-                "message": format!("Nanobot启动后立即退出: {}", stderr.trim()),
-                "exit_code": status.code()
-            }));
-        },
-        Ok(None) => {
-            // 进程还在运行
-            log::info!("Nanobot进程 (PID: {}) 启动成功，正在运行中", id);
-        },
-        Err(e) => {
-            log::error!("检查nanobot进程状态时出错: {}", e);
-        }
-    }
-
-    // 重新启动，这次将 stderr 重定向到日志文件
-    let _ = child.kill();
-    let _ = child.wait();
-
-    // 真正启动 nanobot，将所有输出都重定向到日志文件
-    let mut child = match apply_hidden_window(Command::new(&nanobot_cmd))
-        .args(["gateway", "--port", &port.to_string()])
-        .env("PYTHONUTF8", "1")
-        .env("PYTHONIOENCODING", "utf-8")
-        .stdout(Stdio::from(log_file.try_clone().unwrap()))
-        .stderr(Stdio::from(log_file))
-        .spawn()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            return Ok(json!({
-                "status": "failed",
-                "message": format!("启动 nanobot 失败: {}", e)
-            }));
-        }
-    };
-
-    let id = child.id();
-
-    // 等待一段时间检查进程是否成功启动
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-    // 再次检查进程状态
-    match child.try_wait() {
-        Ok(Some(_status)) => {
-            return Ok(json!({
-                "status": "failed",
-                "message": "Nanobot启动后退出，请检查日志文件获取详细错误信息",
+                "message": format!("Nanobot启动后立即退出: {}", error_msg.trim()),
+                "exit_code": status.code(),
                 "log_path": log_path.to_string_lossy().to_string()
             }));
         },
         Ok(None) => {
-            // 进程还在运行
+            // 进程还在运行，检查是否真正启动成功
+            if check_nanobot_running() {
+                // 保存进程信息到状态
+                let mut process_manager = ProcessManager::new(port);
+                process_manager.set_running(true);
+                process_manager.set_start_time(Instant::now());
+
+                *state.nanobot_process.lock().unwrap() = Some(process_manager);
+
+                log::info!("Nanobot进程 (PID: {}) 启动成功，端口: {}", id, port);
+
+                Ok(json!({
+                    "status": "started",
+                    "message": format!("Nanobot已在端口 {} 启动", port),
+                    "port": port,
+                    "pid": id,
+                    "log_path": log_path.to_string_lossy().to_string()
+                }))
+            } else {
+                // 进程在运行但 check_nanobot_running 返回 false
+                // 可能是进程正在启动中但还未完全就绪
+                // 再等待一小段时间
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+                if check_nanobot_running() {
+                    let mut process_manager = ProcessManager::new(port);
+                    process_manager.set_running(true);
+                    process_manager.set_start_time(Instant::now());
+
+                    *state.nanobot_process.lock().unwrap() = Some(process_manager);
+
+                    Ok(json!({
+                        "status": "started",
+                        "message": format!("Nanobot已在端口 {} 启动", port),
+                        "port": port,
+                        "pid": id,
+                        "log_path": log_path.to_string_lossy().to_string()
+                    }))
+                } else {
+                    Ok(json!({
+                        "status": "failed",
+                        "message": "Nanobot进程启动但未能正常运行，请检查日志文件",
+                        "log_path": log_path.to_string_lossy().to_string()
+                    }))
+                }
+            }
         },
-        Err(_) => {}
+        Err(e) => {
+            log::error!("检查nanobot进程状态时出错: {}", e);
+            Ok(json!({
+                "status": "failed",
+                "message": format!("检查进程状态失败: {}", e),
+                "log_path": log_path.to_string_lossy().to_string()
+            }))
+        }
     }
+}
 
-    if check_nanobot_running() {
-        // 保存进程信息到状态
-        let mut process_manager = ProcessManager::new(port);
-        process_manager.set_running(true);
-        process_manager.set_start_time(Instant::now());
+/// 从日志文件读取新增的内容（从指定位置开始）
+fn read_new_log_content(log_path: &std::path::Path, start_pos: u64) -> String {
+    use std::io::{Read, Seek, SeekFrom};
 
-        *state.nanobot_process.lock().unwrap() = Some(process_manager);
+    match std::fs::File::open(log_path) {
+        Ok(mut file) => {
+            if let Err(e) = file.seek(SeekFrom::Start(start_pos)) {
+                return format!("无法定位日志文件: {}", e);
+            }
 
-        Ok(json!({
-            "status": "started",
-            "message": format!("Nanobot已在端口 {} 启动", port),
-            "port": port,
-            "pid": id,
-            "log_path": log_path.to_string_lossy().to_string()
-        }))
-    } else {
-        Ok(json!({
-            "status": "failed",
-            "message": "Nanobot启动失败，请检查配置",
-            "log_path": log_path.to_string_lossy().to_string()
-        }))
+            let mut content = String::new();
+            if let Err(e) = file.read_to_string(&mut content) {
+                return format!("无法读取日志文件: {}", e);
+            }
+
+            // 只返回最后 1000 个字符，避免过长
+            if content.len() > 1000 {
+                format!("...{}", &content[content.len() - 1000..])
+            } else {
+                content
+            }
+        },
+        Err(e) => format!("无法打开日志文件: {}", e)
     }
 }
 
@@ -569,12 +604,7 @@ pub async fn start_nanobot(port: Option<u16>, state: State<'_, AppState>) -> Res
 #[tauri::command]
 pub async fn stop_nanobot(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     // 使缓存失效
-    {
-        let mut cache = PROCESS_CACHE.lock().unwrap();
-        if let Some(c) = cache.as_mut() {
-            c.invalidate();
-        }
-    }
+    invalidate_cache();
 
     if !check_nanobot_running() {
         return Ok(json!({
@@ -625,17 +655,7 @@ pub async fn stop_nanobot(state: State<'_, AppState>) -> Result<serde_json::Valu
 pub async fn get_status(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     // 实时检查进程是否在运行（不需要缓存，因为需要准确状态）
     // 但我们可以使用较短的有效期来减少刷新
-    {
-        let mut cache = PROCESS_CACHE.lock().unwrap();
-        if let Some(c) = cache.as_mut() {
-            // 如果缓存超过 1 秒，使缓存失效
-            if let Some(last_update) = c.last_update {
-                if last_update.elapsed() > Duration::from_secs(1) {
-                    c.invalidate();
-                }
-            }
-        }
-    }
+    invalidate_cache_if_expired();
 
     let running = check_nanobot_running();
 
@@ -1581,4 +1601,181 @@ fn check_nanobot_dependencies() -> DiagnosticCheck {
             has_issue: false,
         }
     }
+}
+
+/// 获取 Dashboard 所需的所有数据（合并 API，减少调用次数）
+#[tauri::command]
+pub async fn get_dashboard_data(
+    state: State<'_, AppState>,
+    network_state: State<'_, std::sync::Mutex<crate::network::NetworkMonitor>>,
+) -> Result<serde_json::Value, String> {
+    // 并行获取各项数据
+    let status_future = get_status_internal(&state);
+    let system_info_future = get_system_info_internal();
+
+    // 获取配置
+    let config_result = crate::config::load_config_internal();
+
+    // 获取日志统计
+    let log_stats_result = crate::logger::get_log_statistics_internal();
+
+    // 获取网络统计
+    let network_stats = {
+        let mut monitor = network_state.lock().unwrap();
+        monitor.get_stats()
+    };
+
+    // 等待所有异步操作完成
+    let (status, system_info) = tokio::join!(status_future, system_info_future);
+
+    Ok(json!({
+        "status": status?,
+        "systemInfo": system_info?,
+        "config": config_result.unwrap_or(json!({"error": "无法加载配置"})),
+        "logStatistics": log_stats_result.unwrap_or(json!({
+            "total": 0,
+            "debug": 0,
+            "info": 0,
+            "warn": 0,
+            "error": 0,
+        })),
+        "networkStats": network_stats,
+    }))
+}
+
+/// 内部函数：获取进程状态（不带 #[tauri::command]）
+async fn get_status_internal(state: &AppState) -> Result<serde_json::Value, String> {
+    // 实时检查进程是否在运行
+    invalidate_cache_if_expired();
+
+    let running = check_nanobot_running();
+
+    // 如果进程实际在运行，但状态管理器中没有记录，需要更新状态
+    if running {
+        let mut process_guard = state.nanobot_process.lock().unwrap();
+        if process_guard.is_none() {
+            let port = detect_nanobot_port().unwrap_or(18790);
+            let start_timestamp = get_nanobot_start_time();
+
+            let mut process_manager = ProcessManager::new(port);
+            process_manager.set_running(true);
+
+            if let Some(timestamp) = start_timestamp {
+                process_manager.set_process_start_timestamp(timestamp);
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as i64;
+                let elapsed_secs = now - timestamp;
+                process_manager.set_start_time(Instant::now() - std::time::Duration::from_secs(elapsed_secs as u64));
+            } else {
+                process_manager.set_start_time(Instant::now());
+            }
+
+            *process_guard = Some(process_manager);
+        }
+    } else {
+        let process_guard = state.nanobot_process.lock().unwrap();
+        if let Some(manager) = process_guard.as_ref() {
+            manager.set_running(false);
+        }
+    }
+
+    let port = state.nanobot_process.lock().unwrap()
+        .as_ref()
+        .map(|m| m.get_port());
+
+    // 计算运行时间
+    let uptime = if running {
+        state.nanobot_process.lock().unwrap()
+            .as_ref()
+            .and_then(|m| m.get_start_time())
+            .map(|start_time| {
+                let duration = start_time.elapsed();
+                let seconds = duration.as_secs();
+                let hours = seconds / 3600;
+                let minutes = (seconds % 3600) / 60;
+                let secs = seconds % 60;
+
+                if hours > 0 {
+                    format!("{}h {}m {}s", hours, minutes, secs)
+                } else if minutes > 0 {
+                    format!("{}m {}s", minutes, secs)
+                } else {
+                    format!("{}s", secs)
+                }
+            })
+    } else {
+        None
+    };
+
+    Ok(json!({
+        "running": running,
+        "port": port,
+        "uptime": uptime
+    }))
+}
+
+/// 内部函数：获取系统信息（不带 #[tauri::command]）
+async fn get_system_info_internal() -> Result<serde_json::Value, String> {
+    let mut sys = System::new_all();
+    sys.refresh_all();
+
+    let cpu_usage = sys.global_cpu_info().cpu_usage();
+    let total_memory = sys.total_memory();
+    let used_memory = sys.used_memory();
+    let available_memory = sys.available_memory();
+    let memory_usage_percent = if total_memory > 0 {
+        (used_memory as f64 / total_memory as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    fn format_bytes(bytes: u64) -> String {
+        if bytes < 1024 {
+            format!("{} B", bytes)
+        } else if bytes < 1024 * 1024 {
+            format!("{:.2} KB", bytes as f64 / 1024.0)
+        } else if bytes < 1024 * 1024 * 1024 {
+            format!("{:.2} MB", bytes as f64 / (1024.0 * 1024.0))
+        } else {
+            format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+        }
+    }
+
+    let total_swap = sys.total_swap();
+    let used_swap = sys.used_swap();
+    let available_swap = total_swap.saturating_sub(used_swap);
+    let swap_usage_percent = if total_swap > 0 {
+        (used_swap as f64 / total_swap as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    Ok(json!({
+        "cpu": {
+            "usage": cpu_usage,
+            "usage_text": format!("{:.1}%", cpu_usage)
+        },
+        "memory": {
+            "total": total_memory,
+            "total_text": format_bytes(total_memory),
+            "used": used_memory,
+            "used_text": format_bytes(used_memory),
+            "available": available_memory,
+            "available_text": format_bytes(available_memory),
+            "usage_percent": memory_usage_percent,
+            "usage_text": format!("{:.1}%", memory_usage_percent)
+        },
+        "swap": {
+            "total": total_swap,
+            "total_text": format_bytes(total_swap),
+            "used": used_swap,
+            "used_text": format_bytes(used_swap),
+            "available": available_swap,
+            "available_text": format_bytes(available_swap),
+            "usage_percent": swap_usage_percent,
+            "usage_text": format!("{:.1}%", swap_usage_percent)
+        }
+    }))
 }

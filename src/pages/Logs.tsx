@@ -69,6 +69,8 @@ export default function Logs() {
     errorPercent: 0,
   });
   const logContainerRef = useRef<HTMLDivElement>(null);
+  // 使用 useRef 存储取消监听函数，避免内存泄漏
+  const unlistenRef = useRef<(() => void) | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -101,8 +103,8 @@ export default function Logs() {
               });
             });
 
-            // 保存取消监听函数
-            (window as any).__logUnlisten = unlisten;
+            // 使用 useRef 存储取消监听函数
+            unlistenRef.current = unlisten;
             setStreaming(true);
           } catch (error) {
             console.error("恢复监控失败:", error);
@@ -116,10 +118,13 @@ export default function Logs() {
 
     // 组件卸载时清理事件监听器
     return () => {
-      const unlisten = (window as any).__logUnlisten;
-      if (unlisten) {
-        unlisten().catch((e: unknown) => console.error("取消监听失败:", e));
-        (window as any).__logUnlisten = null;
+      if (unlistenRef.current) {
+        try {
+          unlistenRef.current();
+        } catch (e: unknown) {
+          console.error("取消监听失败:", e);
+        }
+        unlistenRef.current = null;
       }
     };
   }, []);
@@ -301,14 +306,13 @@ export default function Logs() {
         setStreaming(false);
         localStorage.setItem("logStreaming", "false");
         // 清理监听器
-        const unlisten = (window as any).__logUnlisten;
-        if (unlisten) {
+        if (unlistenRef.current) {
           try {
-            await unlisten();
+            unlistenRef.current();
           } catch (e) {
             console.error("取消监听失败:", e);
           }
-          (window as any).__logUnlisten = null;
+          unlistenRef.current = null;
         }
         toast.showInfo(t("logs.stopMonitoring"));
       } catch (error) {
@@ -330,8 +334,8 @@ export default function Logs() {
           });
         });
 
-        // 保存取消监听函数
-        (window as any).__logUnlisten = unlisten;
+        // 使用 useRef 存储取消监听函数
+        unlistenRef.current = unlisten;
 
         toast.showSuccess(t("logs.startMonitoring"));
       } catch (error) {

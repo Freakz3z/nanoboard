@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { processApi, configApi, loggerApi, networkApi } from "../lib/tauri";
+import { processApi, configApi, networkApi } from "../lib/tauri";
 import { useToast } from "../contexts/ToastContext";
 
 // 导入类型
@@ -36,14 +36,54 @@ export default function Dashboard() {
   const [installingWithUv, setInstallingWithUv] = useState(false);
   const [installingWithPip, setInstallingWithPip] = useState(false);
 
-  // 刷新所有状态的函数
+  // 使用合并 API 刷新所有状态
   async function refreshAll() {
-    await Promise.all([
-      loadStatus(),
-      loadSystemInfo(),
-      loadConfig(),
-      loadLogStatistics(),
-    ]);
+    try {
+      const data = await processApi.getDashboardData();
+
+      // 更新各项状态
+      if (data.status) {
+        setStatus(data.status);
+      }
+      if (data.systemInfo) {
+        setSystemInfo(data.systemInfo);
+      }
+      if (data.config && !data.config.error) {
+        setConfig(data.config);
+      }
+      if (data.logStatistics) {
+        setLogStatistics(data.logStatistics);
+      }
+
+      // 更新网络数据（带平滑处理）
+      if (data.networkStats) {
+        setNetworkData(prev => {
+          const lastData = prev[prev.length - 1];
+          const stats = data.networkStats;
+
+          let smoothUpload = stats.upload_speed || 0;
+          let smoothDownload = stats.download_speed || 0;
+
+          if (smoothUpload === 0 && lastData && lastData.upload > 0) {
+            smoothUpload = lastData.upload * 0.5;
+          }
+          if (smoothDownload === 0 && lastData && lastData.download > 0) {
+            smoothDownload = lastData.download * 0.5;
+          }
+
+          const displayUpload = smoothUpload > 0 && smoothUpload < 0.1 ? 0.1 : smoothUpload;
+          const displayDownload = smoothDownload > 0 && smoothDownload < 0.1 ? 0.1 : smoothDownload;
+
+          return [...prev.slice(-59), {
+            timestamp: Date.now(),
+            upload: displayUpload,
+            download: displayDownload,
+          }];
+        });
+      }
+    } catch (error) {
+      console.error(t("dashboard.fetchStatusFailed"), error);
+    }
   }
 
   useEffect(() => {
@@ -70,7 +110,6 @@ export default function Dashboard() {
     // 定时刷新（每1秒）
     const interval = setInterval(() => {
       refreshAll();
-      updateNetworkData();
     }, 1000);
 
     // 页面可见性变化时立即刷新
@@ -93,24 +132,6 @@ export default function Dashboard() {
       window.removeEventListener('focus', handleFocus);
     };
   }, []);
-
-  async function loadStatus() {
-    try {
-      const result = await processApi.getStatus();
-      setStatus(result);
-    } catch (error) {
-      console.error(t("dashboard.fetchStatusFailed"), error);
-    }
-  }
-
-  async function loadSystemInfo() {
-    try {
-      const result = await processApi.getSystemInfo();
-      setSystemInfo(result);
-    } catch (error) {
-      console.error(t("dashboard.fetchSystemInfoFailed"), error);
-    }
-  }
 
   async function loadNanobotVersion() {
     try {
@@ -140,51 +161,6 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error(t("dashboard.fetchConfigFailed"), error);
-    }
-  }
-
-  async function loadLogStatistics() {
-    try {
-      const result = await loggerApi.getStatistics();
-      setLogStatistics(result);
-    } catch (error) {
-      console.error(t("dashboard.fetchLogStatsFailed"), error);
-    }
-  }
-
-  // 更新网络数据（从后端获取真实统计）
-  async function updateNetworkData() {
-    try {
-      const stats = await networkApi.getStats();
-      setNetworkData(prev => {
-        const lastData = prev[prev.length - 1];
-
-        // 平滑处理：如果当前值为0但上一次有值，则逐渐衰减而不是突变为0
-        let smoothUpload = stats.upload_speed || 0;
-        let smoothDownload = stats.download_speed || 0;
-
-        // 如果上传速度为0但上次有值，进行衰减处理（保留上次值的50%）
-        if (smoothUpload === 0 && lastData && lastData.upload > 0) {
-          smoothUpload = lastData.upload * 0.5;
-        }
-        // 如果下载速度为0但上次有值，进行衰减处理
-        if (smoothDownload === 0 && lastData && lastData.download > 0) {
-          smoothDownload = lastData.download * 0.5;
-        }
-
-        // 最小显示值为 0.1 B/s，避免完全显示为0
-        const displayUpload = smoothUpload > 0 && smoothUpload < 0.1 ? 0.1 : smoothUpload;
-        const displayDownload = smoothDownload > 0 && smoothDownload < 0.1 ? 0.1 : smoothDownload;
-
-        const newData = [...prev.slice(-59), {
-          timestamp: Date.now(),
-          upload: displayUpload,
-          download: displayDownload,
-        }];
-        return newData;
-      });
-    } catch (error) {
-      console.error(t("dashboard.fetchNetworkStatsFailed"), error);
     }
   }
 
