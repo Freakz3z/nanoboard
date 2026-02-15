@@ -80,7 +80,7 @@ fn get_network_stats_impl() -> (u64, u64) {
     let mut total_transmitted = 0u64;
 
     // 获取所有网络适配器的统计信息
-    if let Ok(output) = std::process::Command::new("powershell")
+    match std::process::Command::new("powershell")
         .args([
             "-NoProfile",
             "-Command",
@@ -89,17 +89,27 @@ fn get_network_stats_impl() -> (u64, u64) {
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
         .output()
     {
-        let content = String::from_utf8_lossy(&output.stdout);
-        for line in content.lines() {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 2 {
-                if let Ok(rx) = parts[0].parse::<u64>() {
-                    total_received += rx;
-                }
-                if let Ok(tx) = parts[1].parse::<u64>() {
-                    total_transmitted += tx;
+        Ok(output) => {
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                log::warn!("PowerShell 网络统计命令执行失败: {}", stderr);
+            } else {
+                let content = String::from_utf8_lossy(&output.stdout);
+                for line in content.lines() {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if parts.len() >= 2 {
+                        if let Ok(rx) = parts[0].parse::<u64>() {
+                            total_received += rx;
+                        }
+                        if let Ok(tx) = parts[1].parse::<u64>() {
+                            total_transmitted += tx;
+                        }
+                    }
                 }
             }
+        }
+        Err(e) => {
+            log::warn!("无法执行 PowerShell 获取网络统计: {}", e);
         }
     }
 

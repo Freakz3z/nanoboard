@@ -209,7 +209,9 @@ export default function FileManager() {
       reader.onload = async (e) => {
         const content = e.target?.result as string;
         if (content) {
-          const result = await sessionApi.saveWorkspaceFile(file.name, content);
+          // 构建完整的目标路径（包含当前目录）
+          const targetPath = currentPath ? `${currentPath}/${file.name}` : file.name;
+          const result = await sessionApi.saveWorkspaceFile(targetPath, content);
           if (result.success) {
             toast.showSuccess(t("files.uploadSuccess"));
             await loadDirectory(currentPath);

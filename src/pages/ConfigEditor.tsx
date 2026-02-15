@@ -518,7 +518,7 @@ export default function ConfigEditor() {
     });
   }
 
-  async function deleteVersion(version: any) {
+  async function deleteVersion(version: ConfigHistoryVersion) {
     try {
       await configApi.deleteVersion(version.filename);
       await loadHistory();

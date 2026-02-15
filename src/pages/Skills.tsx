@@ -244,8 +244,8 @@ export default function Skills() {
   async function confirmDiscardChanges(): Promise<boolean> {
     if (editingContent === skillContent) return true;
 
-    // 简单起见，直接返回 true，实际可以使用确认对话框
-    return true;
+    // 使用确认对话框提示用户
+    return window.confirm(t("skills.discardChangesConfirm") || "您有未保存的更改，确定要丢弃吗？");
   }
 
   function formatTimestamp(timestamp: number): string {

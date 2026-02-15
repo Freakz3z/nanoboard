@@ -66,7 +66,7 @@ fn get_log_path() -> Result<PathBuf> {
     Ok(log_path)
 }
 
-/// 获取最近的日志
+/// 获取最近的日志（优化版：只保留最后 N 行，避免大文件内存问题）
 #[tauri::command]
 pub async fn get_logs(lines: Option<usize>) -> Result<serde_json::Value, String> {
     let log_path = get_log_path().map_err(|e| e.to_string())?;
@@ -83,21 +83,26 @@ pub async fn get_logs(lines: Option<usize>) -> Result<serde_json::Value, String>
         .map_err(|e| format!("打开日志文件失败: {}", e))?;
 
     let reader = BufReader::new(file);
-    let logs: Vec<String> = reader.lines()
-        .map_while(Result::ok)
-        .collect();
 
-    // 只返回最后N行
-    let start = if logs.len() > line_count {
-        logs.len() - line_count
-    } else {
-        0
-    };
+    // 使用环形缓冲区，只保留最后 N 行，避免将整个文件读入内存
+    let mut total_lines = 0usize;
+    let mut ring_buffer: Vec<String> = Vec::with_capacity(line_count);
+
+    for line in reader.lines().map_while(Result::ok) {
+        total_lines += 1;
+        if ring_buffer.len() < line_count {
+            ring_buffer.push(line);
+        } else {
+            // 环形缓冲区已满，移除最旧的行
+            ring_buffer.remove(0);
+            ring_buffer.push(line);
+        }
+    }
 
     Ok(json!({
-        "logs": logs[start..].to_vec(),
-        "total": logs.len(),
-        "showing": logs.len() - start
+        "logs": ring_buffer,
+        "total": total_lines,
+        "showing": ring_buffer.len()
     }))
 }
 
