@@ -8,7 +8,7 @@
 [![React](https://img.shields.io/badge/React-18%2B-blue.svg)](https://react.dev/)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131.svg)](https://tauri.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Release](https://img.shields.io/badge/Release-v0.2.1-blue.svg)](https://github.com/Freakz3z/nanoboard/releases)
+
 
 English | **[简体中文](README.md)**
 

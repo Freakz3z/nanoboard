@@ -1,6 +1,8 @@
 // Prevents additional console window on Windows in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use tauri::Manager;
+
 mod config;
 mod process;
 mod logger;
@@ -32,6 +34,13 @@ async fn main() {
         .manage(std::sync::Mutex::new(network::NetworkMonitor::new()))
         .manage(theme::ThemeState::new())
         .setup(|app| {
+            // 设置窗口图标
+            if let Some(window) = app.get_webview_window("main") {
+                let icon_bytes = include_bytes!("../icons/32x32.png");
+                let icon = tauri::image::Image::new(icon_bytes, 32, 32);
+                let _ = window.set_icon(icon);
+            }
+
             // 构建并设置应用菜单
             let app_handle = app.handle();
             let menu = menu::build_menu(app_handle);

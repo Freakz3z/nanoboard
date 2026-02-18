@@ -76,9 +76,19 @@ export default function ConfigEditor() {
   const { t, i18n } = useTranslation();
   const [config, setConfig] = useState<Config>({});
   const [loading, setLoading] = useState(true);
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["providers", "channels", "mcp", "security"])
-  );
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
+    // 从 localStorage 加载展开状态，如果没有则使用默认值
+    const savedExpanded = localStorage.getItem("configEditorExpandedSections");
+    if (savedExpanded) {
+      try {
+        const parsed = JSON.parse(savedExpanded);
+        return new Set(parsed);
+      } catch (e) {
+        console.error("Failed to load expanded sections:", e);
+      }
+    }
+    return new Set(["providers", "channels", "mcp", "security"]);
+  });
   const [editingProvider, setEditingProvider] = useState<{
     isOpen: boolean;
     providerId: string;
@@ -132,17 +142,6 @@ export default function ConfigEditor() {
   useEffect(() => {
     loadConfig();
     loadProviderAgentConfigs();
-
-    // 从 localStorage 加载展开状态
-    const savedExpanded = localStorage.getItem("configEditorExpandedSections");
-    if (savedExpanded) {
-      try {
-        const parsed = JSON.parse(savedExpanded);
-        setExpandedSections(new Set(parsed));
-      } catch (e) {
-        console.error(t("config.loadExpandStateFailed"), e);
-      }
-    }
   }, []);
 
   // 监听展开状态变化并保存到 localStorage
