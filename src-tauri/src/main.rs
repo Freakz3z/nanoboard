@@ -46,7 +46,8 @@ async fn main() {
             let menu = menu::build_menu(app_handle);
             app.set_menu(menu)?;
 
-            // 设置系统托盘
+            // macOS 不显示托盘图标，只在 Windows/Linux 上显示
+            #[cfg(not(target_os = "macos"))]
             menu::setup_tray(app_handle)?;
 
             // 监听菜单事件

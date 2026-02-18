@@ -60,7 +60,8 @@ pub fn build_menu(app: &AppHandle) -> Menu<Wry> {
     Menu::with_items(app, &[&file_menu, &edit_menu, &view_menu, &tools_menu, &help_menu]).unwrap()
 }
 
-/// 构建系统托盘菜单
+/// 构建系统托盘菜单 (仅 Windows/Linux)
+#[cfg(not(target_os = "macos"))]
 pub fn build_tray_menu(app: &AppHandle) -> Menu<Wry> {
     let toggle_window = MenuItem::with_id(app, "toggle_window", "Show/Hide Window 显示/隐藏", true, None::<&str>).unwrap();
     let separator1 = PredefinedMenuItem::separator(app).unwrap();
@@ -78,19 +79,27 @@ pub fn build_tray_menu(app: &AppHandle) -> Menu<Wry> {
     .unwrap()
 }
 
-/// 设置系统托盘
+/// 设置系统托盘 (仅 Windows/Linux)
+#[cfg(not(target_os = "macos"))]
 pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let tray_menu = build_tray_menu(app);
 
-    // 使用现有的 32x32 图标作为托盘图标
-    let icon_bytes = include_bytes!("../icons/32x32.png");
-    let icon = tauri::image::Image::new(icon_bytes, 32, 32);
+    // 使用专用的托盘图标 (22x22 适合 macOS 托盘)
+    let icon_bytes = include_bytes!("../icons/tray_icon.png");
+    let icon = tauri::image::Image::new(icon_bytes, 22, 22);
 
-    TrayIconBuilder::new()
+    log::info!("Creating tray icon...");
+
+    let tray_result = TrayIconBuilder::new()
         .menu(&tray_menu)
         .tooltip("Nanoboard")
         .icon(icon)
-        .build(app)?;
+        .build(app);
+
+    match tray_result {
+        Ok(_) => log::info!("Tray icon created successfully"),
+        Err(e) => log::error!("Failed to create tray icon: {:?}", e),
+    }
 
     // 监听托盘事件
     let app_handle = app.clone();
