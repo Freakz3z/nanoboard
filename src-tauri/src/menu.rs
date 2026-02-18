@@ -1,6 +1,5 @@
 use tauri::{AppHandle, Manager, Wry};
 use tauri::menu::{Menu, MenuItem, Submenu, PredefinedMenuItem};
-use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::Emitter;
 
 /// 构建应用菜单
