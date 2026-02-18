@@ -11,6 +11,7 @@ import Logs from "./pages/Logs";
 import Workspace from "./pages/Workspace";
 import CronJobs from "./pages/CronJobs";
 import Sessions from "./pages/Sessions";
+import About from "./pages/About";
 import { ContextMenu } from "./components/ContextMenu";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -61,7 +62,7 @@ function AppContent() {
 
     // 监听关于事件
     const unlistenAbout = listen("menu-about", () => {
-      console.log("About Nanoboard");
+      navigate("/about");
     });
     unlisteners.push(() => unlistenAbout.then(fn => fn()));
 
@@ -80,6 +81,7 @@ function AppContent() {
           <Route path="/workspace" element={<Workspace />} />
           <Route path="/sessions" element={<Sessions />} />
           <Route path="/cron" element={<CronJobs />} />
+          <Route path="/about" element={<About />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </ContextMenu>

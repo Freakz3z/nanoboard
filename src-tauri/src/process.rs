@@ -983,6 +983,11 @@ pub async fn get_system_info() -> Result<serde_json::Value, String> {
     let mut sys = System::new_all();
     sys.refresh_all();
 
+    // 获取操作系统信息
+    let os_name = System::name().unwrap_or_else(|| "Unknown".to_string());
+    let os_version = System::os_version().unwrap_or_else(|| "Unknown".to_string());
+    let arch = std::env::consts::ARCH.to_string();
+
     // CPU 使用率
     let cpu_usage = sys.global_cpu_info().cpu_usage();
 
@@ -1020,6 +1025,9 @@ pub async fn get_system_info() -> Result<serde_json::Value, String> {
     };
 
     Ok(json!({
+        "os": os_name,
+        "os_version": os_version,
+        "arch": arch,
         "cpu": {
             "usage": cpu_usage,
             "usage_text": format!("{:.1}%", cpu_usage)
@@ -1270,9 +1278,11 @@ pub async fn diagnose_nanobot() -> Result<serde_json::Value, String> {
 
 #[derive(Clone, serde::Serialize)]
 struct DiagnosticCheck {
+    key: String,
     name: String,
     status: String,
     message: String,
+    message_key: String,
     details: Option<String>,
     has_issue: bool,
 }
@@ -1299,22 +1309,23 @@ fn check_python_environment() -> DiagnosticCheck {
                     if let Some((major, minor, _)) = version_check {
                         if major > 3 || (major == 3 && minor >= 11) {
                             return DiagnosticCheck {
+                                key: "pythonEnv".to_string(),
                                 name: "Python 环境".to_string(),
                                 status: "ok".to_string(),
                                 message: format!("找到 Python: {}", version_str),
-                                details: Some(format!("路径: {}", path)),
+                                message_key: "found".to_string(),
+                                details: Some(path),
                                 has_issue: false,
                             };
                         } else {
                             // Python 版本过低
                             return DiagnosticCheck {
+                                key: "pythonEnv".to_string(),
                                 name: "Python 环境".to_string(),
                                 status: "error".to_string(),
                                 message: format!("Python 版本过低: {} (需要 >= 3.11)", version_str),
-                                details: Some(format!(
-                                    "当前版本: {} {} (需要 3.11+)\n\n升级方法:\nmacOS: brew install python@3.12\n或: pyenv install 3.12.0\n\nWindows: 从 python.org 下载安装 3.11+",
-                                    major, minor
-                                )),
+                                message_key: "versionLow".to_string(),
+                                details: Some(format!("{}|{}", major, minor)),
                                 has_issue: true,
                             };
                         }
@@ -1325,10 +1336,12 @@ fn check_python_environment() -> DiagnosticCheck {
     }
 
     DiagnosticCheck {
+        key: "pythonEnv".to_string(),
         name: "Python 环境".to_string(),
         status: "error".to_string(),
         message: "未找到 Python 3.11+".to_string(),
-        details: Some("nanobot-ai 需要 Python 3.11 或更高版本\n\n安装方法:\nmacOS: brew install python@3.12\nLinux: sudo apt install python3.12\nWindows: 访问 python.org 下载安装".to_string()),
+        message_key: "notFound".to_string(),
+        details: None,
         has_issue: true,
     }
 }
@@ -1368,9 +1381,11 @@ fn check_pip_command() -> DiagnosticCheck {
             if out.status.success() {
                 let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
                 return DiagnosticCheck {
+                    key: "pipCommand".to_string(),
                     name: "pip 命令".to_string(),
                     status: "ok".to_string(),
                     message: format!("找到 pip: {}", version),
+                    message_key: "found".to_string(),
                     details: Some(pip_path),
                     has_issue: false,
                 };
@@ -1379,10 +1394,12 @@ fn check_pip_command() -> DiagnosticCheck {
     }
 
     DiagnosticCheck {
+        key: "pipCommand".to_string(),
         name: "pip 命令".to_string(),
         status: "warning".to_string(),
         message: "未找到 pip 命令".to_string(),
-        details: Some("pip 通常随 Python 一起安装，请确保 Python 已正确安装".to_string()),
+        message_key: "notFound".to_string(),
+        details: None,
         has_issue: false,
     }
 }
@@ -1402,9 +1419,11 @@ fn check_nanobot_installation() -> DiagnosticCheck {
             Ok(out) if out.status.success() => {
                 let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
                 DiagnosticCheck {
+                    key: "nanobotInstall".to_string(),
                     name: "nanobot 安装".to_string(),
                     status: "ok".to_string(),
                     message: format!("nanobot 已安装: {}", version),
+                    message_key: "installed".to_string(),
                     details: Some(path),
                     has_issue: false,
                 }
@@ -1412,29 +1431,35 @@ fn check_nanobot_installation() -> DiagnosticCheck {
             Ok(out) => {
                 let stderr = String::from_utf8_lossy(&out.stderr);
                 DiagnosticCheck {
+                    key: "nanobotInstall".to_string(),
                     name: "nanobot 安装".to_string(),
                     status: "error".to_string(),
                     message: "nanobot 命令存在但执行失败".to_string(),
-                    details: Some(format!("错误: {}\n路径: {}", stderr.trim(), path)),
+                    message_key: "execFailed".to_string(),
+                    details: Some(format!("{}\n{}", stderr.trim(), path)),
                     has_issue: true,
                 }
             }
             Err(e) => {
                 DiagnosticCheck {
+                    key: "nanobotInstall".to_string(),
                     name: "nanobot 安装".to_string(),
                     status: "error".to_string(),
                     message: "nanobot 命令存在但无法执行".to_string(),
-                    details: Some(format!("错误: {}", e)),
+                    message_key: "cannotExec".to_string(),
+                    details: Some(e.to_string()),
                     has_issue: true,
                 }
             }
         }
     } else {
         DiagnosticCheck {
+            key: "nanobotInstall".to_string(),
             name: "nanobot 安装".to_string(),
             status: "error".to_string(),
             message: "未安装 nanobot-ai".to_string(),
-            details: Some("请运行: pip install nanobot-ai\n或在 Nanoboard 中点击下载按钮".to_string()),
+            message_key: "notInstalled".to_string(),
+            details: None,
             has_issue: true,
         }
     }
@@ -1458,36 +1483,35 @@ fn check_nanobot_usable() -> DiagnosticCheck {
             Ok(out) if out.status.success() => {
                 let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
                 DiagnosticCheck {
+                    key: "nanobotUsable".to_string(),
                     name: "nanobot 可用性".to_string(),
                     status: "ok".to_string(),
                     message: format!("nanobot 可正常运行 (版本: {})", version),
-                    details: Some(format!(
-                        "nanobot 已安装且可用\n路径: {}\n\n说明：如果 nanobot 可用，说明 Python 版本实际满足要求，可以忽略版本警告",
-                        path
-                    )),
+                    message_key: "usable".to_string(),
+                    details: Some(path),
                     has_issue: false,
                 }
             }
             Ok(out) => {
                 // 命令执行失败
                 DiagnosticCheck {
+                    key: "nanobotUsable".to_string(),
                     name: "nanobot 可用性".to_string(),
                     status: "warning".to_string(),
                     message: "nanobot 已安装但执行异常".to_string(),
-                    details: Some(format!(
-                        "错误: {}\n路径: {}\n\n建议：运行 nanobot --version 检查问题",
-                        String::from_utf8_lossy(&out.stderr).trim(),
-                        path
-                    )),
+                    message_key: "abnormal".to_string(),
+                    details: Some(format!("{}\n{}", String::from_utf8_lossy(&out.stderr).trim(), path)),
                     has_issue: true,
                 }
             }
             Err(e) => {
                 DiagnosticCheck {
+                    key: "nanobotUsable".to_string(),
                     name: "nanobot 可用性".to_string(),
                     status: "error".to_string(),
                     message: "nanobot 命令存在但无法执行".to_string(),
-                    details: Some(format!("错误: {}", e)),
+                    message_key: "cannotExec".to_string(),
+                    details: Some(e.to_string()),
                     has_issue: true,
                 }
             }
@@ -1495,10 +1519,12 @@ fn check_nanobot_usable() -> DiagnosticCheck {
     } else {
         // nanobot 未安装
         DiagnosticCheck {
+            key: "nanobotUsable".to_string(),
             name: "nanobot 可用性".to_string(),
             status: "error".to_string(),
             message: "nanobot 未安装".to_string(),
-            details: Some("请点击 'uv 下载' 或 'pip 下载' 按钮进行安装".to_string()),
+            message_key: "notInstalled".to_string(),
+            details: None,
             has_issue: true,
         }
     }
@@ -1509,9 +1535,11 @@ fn check_config_file() -> DiagnosticCheck {
         Some(dir) => dir,
         None => {
             return DiagnosticCheck {
+                key: "configFile".to_string(),
                 name: "配置文件".to_string(),
                 status: "error".to_string(),
                 message: "无法找到用户主目录".to_string(),
+                message_key: "homeNotFound".to_string(),
                 details: None,
                 has_issue: true,
             };
@@ -1522,10 +1550,12 @@ fn check_config_file() -> DiagnosticCheck {
 
     if !config_path.exists() {
         return DiagnosticCheck {
+            key: "configFile".to_string(),
             name: "配置文件".to_string(),
             status: "warning".to_string(),
             message: "配置文件不存在".to_string(),
-            details: Some("请运行: nanobot onboard\n或在 Nanoboard 中点击初始化按钮".to_string()),
+            message_key: "notExist".to_string(),
+            details: None,
             has_issue: false,
         };
     }
@@ -1535,10 +1565,12 @@ fn check_config_file() -> DiagnosticCheck {
         Ok(content) => content,
         Err(e) => {
             return DiagnosticCheck {
+                key: "configFile".to_string(),
                 name: "配置文件".to_string(),
                 status: "error".to_string(),
                 message: "无法读取配置文件".to_string(),
-                details: Some(format!("错误: {}", e)),
+                message_key: "cannotRead".to_string(),
+                details: Some(e.to_string()),
                 has_issue: true,
             };
         }
@@ -1546,17 +1578,21 @@ fn check_config_file() -> DiagnosticCheck {
 
     match serde_json::from_str::<serde_json::Value>(&config_content) {
         Ok(_) => DiagnosticCheck {
+            key: "configFile".to_string(),
             name: "配置文件".to_string(),
             status: "ok".to_string(),
             message: "配置文件存在且有效".to_string(),
+            message_key: "valid".to_string(),
             details: Some(config_path.to_string_lossy().to_string()),
             has_issue: false,
         },
         Err(e) => DiagnosticCheck {
+            key: "configFile".to_string(),
             name: "配置文件".to_string(),
             status: "error".to_string(),
             message: "配置文件格式无效".to_string(),
-            details: Some(format!("错误: {}", e)),
+            message_key: "invalidFormat".to_string(),
+            details: Some(e.to_string()),
             has_issue: true,
         },
     }
@@ -1586,18 +1622,22 @@ fn check_nanobot_dependencies() -> DiagnosticCheck {
 
     if missing_deps.is_empty() {
         DiagnosticCheck {
+            key: "dependencies".to_string(),
             name: "依赖检查".to_string(),
             status: "ok".to_string(),
             message: "核心依赖已安装".to_string(),
+            message_key: "installed".to_string(),
             details: None,
             has_issue: false,
         }
     } else {
         DiagnosticCheck {
+            key: "dependencies".to_string(),
             name: "依赖检查".to_string(),
             status: "warning".to_string(),
             message: format!("部分依赖可能缺失: {}", missing_deps.join(", ")),
-            details: Some("请尝试重新安装: pip install nanobot-ai --upgrade".to_string()),
+            message_key: "missing".to_string(),
+            details: Some(missing_deps.join(", ")),
             has_issue: false,
         }
     }
@@ -1721,6 +1761,11 @@ async fn get_system_info_internal() -> Result<serde_json::Value, String> {
     let mut sys = System::new_all();
     sys.refresh_all();
 
+    // 获取操作系统信息
+    let os_name = System::name().unwrap_or_else(|| "Unknown".to_string());
+    let os_version = System::os_version().unwrap_or_else(|| "Unknown".to_string());
+    let arch = std::env::consts::ARCH.to_string();
+
     let cpu_usage = sys.global_cpu_info().cpu_usage();
     let total_memory = sys.total_memory();
     let used_memory = sys.used_memory();
@@ -1753,6 +1798,9 @@ async fn get_system_info_internal() -> Result<serde_json::Value, String> {
     };
 
     Ok(json!({
+        "os": os_name,
+        "os_version": os_version,
+        "arch": arch,
         "cpu": {
             "usage": cpu_usage,
             "usage_text": format!("{:.1}%", cpu_usage)

@@ -17,7 +17,8 @@
     "workspace": "工作区",
     "chatSessions": "会话",
     "cron": "定时任务",
-    "config": "设置"
+    "config": "设置",
+    "about": "关于"
   },
   "layout": {
     "logoAlt": "Nanoboard Logo",
@@ -117,7 +118,57 @@
     "operationFailed": "操作失败:",
     "operationFailedToast": "操作失败: ",
     "clickToStartConfig": "点击渠道卡片开始配置",
-    "jsonSyntaxErrorPrefix": "JSON 语法错误: "
+    "jsonSyntaxErrorPrefix": "JSON 语法错误: ",
+    "diagnosisChecks": {
+      "pythonEnv": {
+        "name": "Python 环境",
+        "found": "找到 Python: {{version}}",
+        "versionLow": "Python 版本过低: {{version}} (需要 >= 3.11)",
+        "notFound": "未找到 Python 3.11+",
+        "path": "路径: {{path}}",
+        "versionLowDetails": "当前版本: {{version}} (需要 3.11+)\n\n升级方法:\nmacOS: brew install python@3.12\n或: pyenv install 3.12.0\n\nWindows: 从 python.org 下载安装 3.11+",
+        "notFoundDetails": "nanobot-ai 需要 Python 3.11 或更高版本\n\n安装方法:\nmacOS: brew install python@3.12\nLinux: sudo apt install python3.12\nWindows: 访问 python.org 下载安装"
+      },
+      "pipCommand": {
+        "name": "pip 命令",
+        "found": "找到 pip: {{version}}",
+        "notFound": "未找到 pip 命令",
+        "notFoundDetails": "pip 通常随 Python 一起安装，请确保 Python 已正确安装"
+      },
+      "nanobotInstall": {
+        "name": "nanobot 安装",
+        "installed": "nanobot 已安装: {{version}}",
+        "execFailed": "nanobot 命令存在但执行失败",
+        "cannotExec": "nanobot 命令存在但无法执行",
+        "notInstalled": "未安装 nanobot-ai",
+        "notInstalledDetails": "请运行: pip install nanobot-ai\n或在 Nanoboard 中点击下载按钮"
+      },
+      "nanobotUsable": {
+        "name": "nanobot 可用性",
+        "usable": "nanobot 可正常运行 (版本: {{version}})",
+        "usableDetails": "nanobot 已安装且可用\n路径: {{path}}\n\n说明：如果 nanobot 可用，说明 Python 版本实际满足要求，可以忽略版本警告",
+        "abnormal": "nanobot 已安装但执行异常",
+        "abnormalDetails": "错误: {{error}}\n路径: {{path}}\n\n建议：运行 nanobot --version 检查问题",
+        "cannotExec": "nanobot 命令存在但无法执行",
+        "notInstalled": "nanobot 未安装",
+        "notInstalledDetails": "请点击 'uv 下载' 或 'pip 下载' 按钮进行安装"
+      },
+      "configFile": {
+        "name": "配置文件",
+        "homeNotFound": "无法找到用户主目录",
+        "notExist": "配置文件不存在",
+        "notExistDetails": "请运行: nanobot onboard\n或在 Nanoboard 中点击初始化按钮",
+        "cannotRead": "无法读取配置文件",
+        "valid": "配置文件存在且有效",
+        "invalidFormat": "配置文件格式无效"
+      },
+      "dependencies": {
+        "name": "依赖检查",
+        "installed": "核心依赖已安装",
+        "missing": "部分依赖可能缺失: {{deps}}",
+        "missingDetails": "请尝试重新安装: pip install nanobot-ai --upgrade"
+      }
+    }
   },
   "config": {
     "title": "编辑配置",
@@ -668,6 +719,7 @@
     "selectTime": "请选择执行时间",
     "deliverHint": "如需将结果投递到消息频道，请在消息渠道中与 Nanobot 对话，让其设置 jobs.json 中的 channel 与 chat_id",
     "restartHint": "Jobs 配置完成后可能需要重启 nanobot 才能生效",
+    "chatHint": "建议直接与 nanobot 对话完成定时任务的添加",
     "enable": "启用",
     "disable": "禁用",
     "enabled": "已启用",
@@ -684,6 +736,12 @@
     "confirm": "添加",
     "adding": "添加中...",
     "nextRun": "下次执行",
+    "lastRun": "上次执行",
+    "enableDeliver": "启用结果推送",
+    "channel": "推送渠道",
+    "selectChannel": "选择渠道",
+    "recipient": "接收者",
+    "recipientPlaceholder": "用户ID或群组ID",
     "presets": {
       "everyMinute": "每分钟",
       "every5Minutes": "每5分钟",
@@ -793,5 +851,25 @@
     "hoursAgo": "{{count}} 小时前",
     "yesterday": "昨天",
     "daysAgo": "{{count}} 天前"
+  },
+  "about": {
+    "title": "关于",
+    "version": "版本",
+    "techStack": "技术栈",
+    "author": "作者信息",
+    "username": "用户名",
+    "email": "邮箱",
+    "systemInfo": "系统信息",
+    "os": "操作系统",
+    "arch": "架构",
+    "pythonVersion": "Python 版本",
+    "nanobotVersion": "Nanobot 版本",
+    "paths": "路径信息",
+    "cronJobsLocation": "定时任务配置",
+    "installation": "安装 Nanobot",
+    "newVersionAvailable": "有新版本",
+    "checkingUpdate": "检查更新中...",
+    "updateCheckFailed": "检查更新失败",
+    "latestVersion": "已是最新版本"
   }
 }

@@ -16,6 +16,7 @@ import {
   ChevronRight,
   MessageSquare,
   FolderTree,
+  Info,
 } from "lucide-react";
 import { processApi } from "../lib/tauri";
 import { useToast } from "../contexts/ToastContext";
@@ -55,6 +56,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: "/workspace", label: t("nav.workspace"), icon: FolderTree },
     { path: "/cron", label: t("nav.cron"), icon: CalendarClock },
     { path: "/config", label: t("nav.config"), icon: Settings },
+    { path: "/about", label: t("nav.about"), icon: Info },
   ];
 
   useEffect(() => {

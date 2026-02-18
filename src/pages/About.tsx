@@ -1,0 +1,408 @@
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { processApi } from "../lib/tauri";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import {
+  Github,
+  Monitor,
+  Cpu,
+  FileText,
+  Bot,
+  Download,
+  Stethoscope,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  Sparkles,
+} from "lucide-react";
+import type { DiagnosticResult } from "@/types";
+
+// 应用信息
+const APP_INFO = {
+  name: "nanoboard",
+  version: "0.2.4",
+  description: "一个极轻量化 nanobot Tauri 管理助手",
+  descriptionEn: "An Ultra-lightweight nanobot Tauri Management Assistant",
+  github: "https://github.com/Freakz3z/nanoboard",
+  releasesApi: "https://api.github.com/repos/Freakz3z/nanoboard/releases/latest",
+};
+
+interface SystemInfoData {
+  os: string;
+  osVersion: string;
+  arch: string;
+  pythonVersion: string | null;
+  nanobotVersion: string | null;
+  nanobotPath: string | null;
+}
+
+type UpdateStatus = "checking" | "latest" | "available" | "error";
+
+export default function About() {
+  const { t } = useTranslation();
+  const [systemInfo, setSystemInfo] = useState<SystemInfoData | null>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnosisResult, setDiagnosticResult] = useState<DiagnosticResult | null>(null);
+  const [showDiagnosis, setShowDiagnosis] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("checking");
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadSystemInfo();
+    checkForUpdates();
+  }, []);
+
+  async function checkForUpdates() {
+    try {
+      setUpdateStatus("checking");
+      const response = await fetch(APP_INFO.releasesApi, {
+        headers: {
+          "Accept": "application/vnd.github.v3+json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch releases");
+      }
+
+      const data = await response.json();
+      const latest = data.tag_name?.replace(/^v/, "") || data.name?.replace(/^v/, "");
+
+      if (latest && latest !== APP_INFO.version) {
+        setLatestVersion(latest);
+        setUpdateStatus("available");
+      } else {
+        setUpdateStatus("latest");
+      }
+    } catch (error) {
+      console.error("Failed to check for updates:", error);
+      setUpdateStatus("error");
+    }
+  }
+
+  async function loadSystemInfo() {
+    try {
+      const [sysInfo, versionInfo, pathInfo] = await Promise.all([
+        processApi.getSystemInfo(),
+        processApi.getVersion().catch(() => null),
+        processApi.getNanobotPath().catch(() => null),
+      ]);
+
+      setSystemInfo({
+        os: sysInfo?.os || "Unknown",
+        osVersion: sysInfo?.os_version || "",
+        arch: sysInfo?.arch || "Unknown",
+        pythonVersion: sysInfo?.python_version || null,
+        nanobotVersion: versionInfo?.version || null,
+        nanobotPath: pathInfo?.path || null,
+      });
+    } catch (error) {
+      console.error("Failed to load system info:", error);
+    }
+  }
+
+  async function runDiagnosis() {
+    setDiagnosing(true);
+    try {
+      const result = await processApi.diagnose();
+      setDiagnosticResult(result);
+      setShowDiagnosis(true);
+    } catch (error) {
+      setDiagnosticResult({
+        overall: "failed",
+        checks: [
+          {
+            key: "diagnosis",
+            name: t("dashboard.diagnosis"),
+            status: "error",
+            message: t("dashboard.diagnosisFailed") + (error as Error).message,
+            message_key: "failed",
+            has_issue: true,
+          },
+        ],
+      });
+      setShowDiagnosis(true);
+    } finally {
+      setDiagnosing(false);
+    }
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto p-8 scrollbar-thin bg-white dark:bg-dark-bg-base transition-colors duration-200">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* 应用信息卡片 */}
+        <div className="p-6 bg-white dark:bg-dark-bg-card rounded-xl border border-gray-200 dark:border-dark-border-subtle shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-dark-text-primary">
+                  {APP_INFO.name}
+                </h2>
+                <span className="text-sm text-gray-500 dark:text-dark-text-muted">
+                  v{APP_INFO.version}
+                </span>
+                {updateStatus === "available" && latestVersion && (
+                  <button
+                    onClick={() => openUrl(`${APP_INFO.github}/releases/latest`)}
+                    className="flex items-center gap-1.5 px-2 py-0.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-medium rounded-full hover:from-purple-600 hover:to-pink-600 transition-all cursor-pointer animate-pulse"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    {t("about.newVersionAvailable")} (v{latestVersion})
+                  </button>
+                )}
+                {updateStatus === "latest" && (
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full">
+                    <CheckCircle className="w-3 h-3" />
+                    {t("about.latestVersion")}
+                  </span>
+                )}
+                <button
+                  onClick={() => openUrl(APP_INFO.github)}
+                  className="p-2 bg-gray-100 dark:bg-dark-bg-sidebar hover:bg-gray-200 dark:hover:bg-dark-bg-hover rounded-full transition-colors cursor-pointer"
+                  title="GitHub"
+                >
+                  <Github className="w-4 h-4 text-gray-600 dark:text-dark-text-secondary" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-dark-text-secondary mt-2">
+                {APP_INFO.description}｜{APP_INFO.descriptionEn}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 系统信息卡片 */}
+        <div className="p-6 bg-white dark:bg-dark-bg-card rounded-xl border border-gray-200 dark:border-dark-border-subtle shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary">
+              {t("about.systemInfo")}
+            </h2>
+            <div className="flex items-center gap-2">
+              {/* 安装按钮 - 仅在未检测到 nanobot 时显示 */}
+              {systemInfo && !systemInfo.nanobotVersion && (
+                <>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const result = await processApi.downloadWithUv();
+                        if (result.status === "success") {
+                          await processApi.onboard();
+                          loadSystemInfo();
+                        }
+                      } catch (error) {
+                        console.error("Installation failed:", error);
+                      }
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+                  >
+                    <Download className="w-4 h-4" />
+                    {t("dashboard.downloadWithUv")}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const result = await processApi.download();
+                        if (result.status === "success") {
+                          await processApi.onboard();
+                          loadSystemInfo();
+                        }
+                      } catch (error) {
+                        console.error("Installation failed:", error);
+                      }
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                  >
+                    <Download className="w-4 h-4" />
+                    {t("dashboard.downloadWithPip")}
+                  </button>
+                </>
+              )}
+              <button
+                onClick={runDiagnosis}
+                disabled={diagnosing}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                <Stethoscope className="w-4 h-4" />
+                {diagnosing ? t("dashboard.diagnosing") : t("dashboard.diagnosis")}
+              </button>
+            </div>
+          </div>
+
+          {/* 诊断结果 */}
+          {showDiagnosis && diagnosisResult && (
+            <DiagnosticResultPanel
+              diagnosisResult={diagnosisResult}
+              onClose={() => setShowDiagnosis(false)}
+            />
+          )}
+
+          {systemInfo && (
+            <div className="space-y-3">
+              <InfoRow
+                icon={Monitor}
+                label={t("about.os")}
+                value={systemInfo.osVersion ? `${systemInfo.os} ${systemInfo.osVersion}` : systemInfo.os}
+              />
+              <InfoRow
+                icon={Cpu}
+                label={t("about.arch")}
+                value={systemInfo.arch}
+              />
+              <InfoRow
+                icon={Bot}
+                label={t("about.nanobotVersion")}
+                value={systemInfo.nanobotVersion || t("dashboard.notInstalled")}
+                status={systemInfo.nanobotVersion ? "ok" : "warning"}
+              />
+              <InfoRow
+                icon={FileText}
+                label={t("dashboard.nanobotLocation")}
+                value={systemInfo.nanobotPath || t("dashboard.notInstalled")}
+                status={systemInfo.nanobotPath ? "ok" : "warning"}
+                mono
+              />
+            </div>
+          )}
+
+          {/* 路径信息 */}
+          <div className="mt-6 pt-6 border-t border-gray-100 dark:border-dark-border-subtle">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-dark-text-muted mb-3">
+              {t("about.paths")}
+            </h3>
+            <div className="space-y-2">
+              {[
+                { label: t("dashboard.configFileLocation"), value: "~/.nanobot/config.json" },
+                { label: t("dashboard.workspaceLocation"), value: "~/.nanobot/workspace" },
+                { label: t("dashboard.logLocation"), value: "~/.nanobot/logs/nanobot.log" },
+                { label: t("about.cronJobsLocation"), value: "~/.nanobot/cron/jobs.json" },
+              ].map((item, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-bg-sidebar rounded-lg"
+                >
+                  <span className="text-sm text-gray-600 dark:text-dark-text-secondary">{item.label}</span>
+                  <code className="text-xs font-mono text-gray-500 dark:text-dark-text-muted">{item.value}</code>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({
+  icon: Icon,
+  label,
+  value,
+  status = "ok",
+  mono = false,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  status?: "ok" | "warning" | "error";
+  mono?: boolean;
+}) {
+  const statusColors = {
+    ok: "text-green-600 dark:text-green-400",
+    warning: "text-amber-600 dark:text-amber-400",
+    error: "text-red-600 dark:text-red-400",
+  };
+
+  const StatusIcon = {
+    ok: CheckCircle,
+    warning: AlertCircle,
+    error: XCircle,
+  }[status];
+
+  return (
+    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-dark-bg-sidebar rounded-lg">
+      <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+        <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+      </div>
+      <div className="flex-1">
+        <p className="text-xs text-gray-500 dark:text-dark-text-muted">{label}</p>
+        <p className={`text-sm mt-0.5 ${mono ? "font-mono text-gray-500 dark:text-dark-text-muted" : "font-medium text-gray-900 dark:text-dark-text-primary"}`}>
+          {value}
+        </p>
+      </div>
+      <StatusIcon className={`w-5 h-5 ${statusColors[status]}`} />
+    </div>
+  );
+}
+
+function DiagnosticResultPanel({
+  diagnosisResult,
+  onClose,
+}: {
+  diagnosisResult: DiagnosticResult;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+
+  // 获取翻译后的检查项名称
+  const getCheckName = (check: DiagnosticResult["checks"][0]) => {
+    const nameKey = `dashboard.diagnosisChecks.${check.key}.name`;
+    const translated = t(nameKey);
+    return translated === nameKey ? check.name : translated;
+  };
+
+  // 获取翻译后的消息
+  const getCheckMessage = (check: DiagnosticResult["checks"][0]) => {
+    const msgKey = `dashboard.diagnosisChecks.${check.key}.${check.message_key}`;
+    const translated = t(msgKey, { version: check.details || "", path: check.details || "", deps: check.details || "" });
+    return translated === msgKey ? check.message : translated;
+  };
+
+  return (
+    <div className="mb-6 p-5 rounded-lg border bg-gray-50 dark:bg-dark-bg-sidebar border-gray-200 dark:border-dark-border-subtle">
+      <div className="flex items-center gap-2 mb-4">
+        {diagnosisResult.overall === "passed" ? (
+          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+        ) : (
+          <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+        )}
+        <h3 className="font-semibold text-gray-900 dark:text-dark-text-primary">
+          {t("dashboard.diagnosisResult")}: {diagnosisResult.overall === "passed" ? t("dashboard.passed") : t("dashboard.issuesFound")}
+        </h3>
+      </div>
+      <div className="space-y-3">
+        {diagnosisResult.checks.map((check, idx) => (
+          <div key={idx} className="flex items-start gap-3 p-3 rounded bg-white dark:bg-dark-bg-card border border-gray-200 dark:border-dark-border-subtle">
+            <div className="mt-0.5">
+              {check.status === "ok" && <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />}
+              {check.status === "warning" && <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
+              {check.status === "error" && <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-gray-900 dark:text-dark-text-primary">{getCheckName(check)}</p>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  check.status === "ok" ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" :
+                  check.status === "warning" ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" :
+                  "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+                }`}>
+                  {check.status === "ok" ? t("dashboard.normal") : check.status === "warning" ? t("dashboard.warning") : t("dashboard.error")}
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 dark:text-dark-text-secondary mt-1">{getCheckMessage(check)}</p>
+              {check.details && (
+                <p className="text-xs text-gray-500 dark:text-dark-text-muted mt-1 whitespace-pre-wrap font-mono bg-gray-50 dark:bg-dark-bg-hover p-2 rounded">
+                  {check.details}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={onClose}
+        className="mt-4 text-sm text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text-primary transition-colors"
+      >
+        {t("dashboard.closeDiagnosticResult")}
+      </button>
+    </div>
+  );
+}

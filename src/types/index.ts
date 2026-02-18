@@ -51,9 +51,11 @@ export interface SystemInfo {
 }
 
 export interface DiagnosticCheck {
+  key: string;
   name: string;
   status: 'ok' | 'warning' | 'error';
   message: string;
+  message_key: string;
   details?: string;
   has_issue: boolean;
 }
@@ -190,22 +192,60 @@ export type Theme = 'light' | 'dark' | 'system';
 
 // ============ 定时任务相关 ============
 
+/** 调度类型 */
+export type ScheduleKind = "cron" | "every" | "at";
+
+/** 调度配置 */
+export interface CronSchedule {
+  kind: ScheduleKind;
+  atMs: number | null;
+  everyMs: number | null;
+  expr: string | null;
+  tz: string | null;
+}
+
+/** 任务负载类型 */
+export type PayloadKind = "agent_turn";
+
+/** 任务负载 */
+export interface CronPayload {
+  kind: PayloadKind;
+  message: string;
+  deliver: boolean;
+  channel: string | null;
+  to: string | null;
+}
+
+/** 任务状态 */
+export interface CronState {
+  nextRunAtMs: number | null;
+  lastRunAtMs: number | null;
+  lastStatus: "success" | "failed" | "running" | null;
+  lastError: string | null;
+}
+
+/** 定时任务完整结构 */
 export interface CronJob {
   id: string;
   name: string;
-  schedule: string;
-  message: string;
-  status?: string;
-  next_run?: string;
-  channel?: string;
-  to?: string;
-  deliver?: boolean;
+  enabled: boolean;
+  schedule: CronSchedule;
+  payload: CronPayload;
+  state: CronState;
+  createdAtMs: number;
+  updatedAtMs: number;
+  deleteAfterRun: boolean;
+}
+
+/** 任务列表文件结构 */
+export interface CronJobsFile {
+  version: number;
+  jobs: CronJob[];
 }
 
 export interface CronListResult {
   success: boolean;
   jobs: CronJob[];
-  raw?: string;
   message?: string;
 }
 

@@ -9,7 +9,8 @@
     "workspace": "Workspace",
     "chatSessions": "Sessions",
     "cron": "Cron",
-    "config": "Settings"
+    "config": "Settings",
+    "about": "About"
   },
   "layout": {
     "logoAlt": "Nanoboard Logo",
@@ -109,7 +110,57 @@
     "operationFailed": "Operation failed:",
     "operationFailedToast": "Operation failed: ",
     "clickToStartConfig": "Click a channel card to start configuring",
-    "jsonSyntaxErrorPrefix": "JSON syntax error: "
+    "jsonSyntaxErrorPrefix": "JSON syntax error: ",
+    "diagnosisChecks": {
+      "pythonEnv": {
+        "name": "Python Environment",
+        "found": "Found Python: {{version}}",
+        "versionLow": "Python version too low: {{version}} (requires >= 3.11)",
+        "notFound": "Python 3.11+ not found",
+        "path": "Path: {{path}}",
+        "versionLowDetails": "Current version: {{version}} (requires 3.11+)\n\nUpgrade methods:\nmacOS: brew install python@3.12\nor: pyenv install 3.12.0\n\nWindows: Download from python.org (3.11+)",
+        "notFoundDetails": "nanobot-ai requires Python 3.11 or higher\n\nInstallation methods:\nmacOS: brew install python@3.12\nLinux: sudo apt install python3.12\nWindows: Visit python.org to download"
+      },
+      "pipCommand": {
+        "name": "pip Command",
+        "found": "Found pip: {{version}}",
+        "notFound": "pip command not found",
+        "notFoundDetails": "pip is usually installed with Python, please ensure Python is correctly installed"
+      },
+      "nanobotInstall": {
+        "name": "nanobot Installation",
+        "installed": "nanobot installed: {{version}}",
+        "execFailed": "nanobot command exists but failed to execute",
+        "cannotExec": "nanobot command exists but cannot be executed",
+        "notInstalled": "nanobot-ai not installed",
+        "notInstalledDetails": "Run: pip install nanobot-ai\nOr click the download button in Nanoboard"
+      },
+      "nanobotUsable": {
+        "name": "nanobot Usability",
+        "usable": "nanobot runs normally (version: {{version}})",
+        "usableDetails": "nanobot is installed and usable\nPath: {{path}}\n\nNote: If nanobot is usable, Python version meets requirements and version warnings can be ignored",
+        "abnormal": "nanobot installed but execution abnormal",
+        "abnormalDetails": "Error: {{error}}\nPath: {{path}}\n\nSuggestion: Run nanobot --version to check the issue",
+        "cannotExec": "nanobot command exists but cannot be executed",
+        "notInstalled": "nanobot not installed",
+        "notInstalledDetails": "Click 'Download with uv' or 'Download with pip' button to install"
+      },
+      "configFile": {
+        "name": "Config File",
+        "homeNotFound": "Cannot find user home directory",
+        "notExist": "Config file does not exist",
+        "notExistDetails": "Run: nanobot onboard\nOr click the initialize button in Nanoboard",
+        "cannotRead": "Cannot read config file",
+        "valid": "Config file exists and is valid",
+        "invalidFormat": "Config file format is invalid"
+      },
+      "dependencies": {
+        "name": "Dependencies Check",
+        "installed": "Core dependencies installed",
+        "missing": "Some dependencies may be missing: {{deps}}",
+        "missingDetails": "Try reinstalling: pip install nanobot-ai --upgrade"
+      }
+    }
   },
   "config": {
     "title": "Edit Config",
@@ -669,6 +720,7 @@
     "selectTime": "Please select a time",
     "deliverHint": "To deliver results to a messaging channel, chat with Nanobot in that channel and ask it to set the channel and chat_id in jobs.json",
     "restartHint": "You may need to restart nanobot for job changes to take effect",
+    "chatHint": "It is recommended to chat with nanobot directly to add scheduled tasks",
     "enable": "Enable",
     "disable": "Disable",
     "enabled": "Enabled",
@@ -685,6 +737,12 @@
     "confirm": "Add",
     "adding": "Adding...",
     "nextRun": "Next run",
+    "lastRun": "Last run",
+    "enableDeliver": "Enable result delivery",
+    "channel": "Channel",
+    "selectChannel": "Select channel",
+    "recipient": "Recipient",
+    "recipientPlaceholder": "User ID or Group ID",
     "presets": {
       "everyMinute": "Every minute",
       "every5Minutes": "Every 5 min",
@@ -794,5 +852,25 @@
     "hoursAgo": "{{count}} hours ago",
     "yesterday": "Yesterday",
     "daysAgo": "{{count}} days ago"
+  },
+  "about": {
+    "title": "About",
+    "version": "Version",
+    "techStack": "Tech Stack",
+    "author": "Author",
+    "username": "Username",
+    "email": "Email",
+    "systemInfo": "System Info",
+    "os": "Operating System",
+    "arch": "Architecture",
+    "pythonVersion": "Python Version",
+    "nanobotVersion": "Nanobot Version",
+    "paths": "Paths",
+    "cronJobsLocation": "Cron Jobs Config",
+    "installation": "Install Nanobot",
+    "newVersionAvailable": "New version available",
+    "checkingUpdate": "Checking for updates...",
+    "updateCheckFailed": "Failed to check for updates",
+    "latestVersion": "Up to date"
   }
 }

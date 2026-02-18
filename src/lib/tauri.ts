@@ -123,6 +123,8 @@ export const cronApi = {
   list: () => invoke<CronListResult>("cron_list"),
   add: (name: string, message: string, scheduleType: string, scheduleValue: string, deliver?: boolean, to?: string, channel?: string) =>
     invoke<CronOperationResult>("cron_add", { name, message, scheduleType, scheduleValue, deliver, to, channel }),
+  update: (jobId: string, name: string, message: string, scheduleType: string, scheduleValue: string, enabled?: boolean, deliver?: boolean, to?: string, channel?: string) =>
+    invoke<CronOperationResult>("cron_update", { jobId, name, message, scheduleType, scheduleValue, enabled, deliver, to, channel }),
   remove: (jobId: string) => invoke<CronOperationResult>("cron_remove", { jobId }),
   enable: (jobId: string, disable: boolean) => invoke<CronOperationResult>("cron_enable", { jobId, disable }),
   run: (jobId: string) => invoke<CronOperationResult>("cron_run", { jobId }),

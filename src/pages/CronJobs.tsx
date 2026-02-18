@@ -11,16 +11,18 @@ import {
   CalendarClock,
   MessageSquare,
   X,
-  Play,
   Power,
   PowerOff,
   Send,
   Pencil,
   AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Bell,
 } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import ConfirmDialog from "../components/ConfirmDialog";
-import type { CronJob } from "../types";
+import type { CronJob, CronSchedule } from "../types";
 
 interface AddJobForm {
   name: string;
@@ -33,6 +35,40 @@ interface AddJobForm {
   cronDow: string;
   everySeconds: string;
   atTime: string;
+  deliver: boolean;
+  channel: string;
+  to: string;
+}
+
+// 格式化时间戳为可读日期时间
+function formatTimestamp(ms: number | null): string {
+  if (ms === null) return "-";
+  const date = new Date(ms);
+  return date.toLocaleString("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// 格式化相对时间
+function formatRelativeTime(ms: number | null): string {
+  if (ms === null) return "-";
+  const now = Date.now();
+  const diff = ms - now;
+
+  if (diff < 0) return "已过期";
+
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (days > 0) return `${days} 天后`;
+  if (hours > 0) return `${hours} 小时后`;
+  if (minutes > 0) return `${minutes} 分钟后`;
+  return "即将执行";
 }
 
 export default function CronJobs() {
@@ -55,6 +91,9 @@ export default function CronJobs() {
     cronDow: "*",
     everySeconds: "3600",
     atTime: "",
+    deliver: false,
+    channel: "",
+    to: "",
   });
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -107,52 +146,42 @@ export default function CronJobs() {
 
     setIsSubmitting(true);
 
-    // 保存旧任务信息，以便在添加失败时恢复
-    const oldJobBackup = editingJob ? {
-      name: editingJob.name || "",
-      message: editingJob.message || "",
-      schedule: editingJob.schedule || "",
-    } : null;
-
     try {
-      // 编辑模式：先删除旧任务
+      let result;
+
       if (editingJob) {
-        const removeResult = await cronApi.remove(editingJob.id);
-        if (!removeResult.success) {
-          toast.showError(removeResult.message || t("cron.removeFailed"));
-          setIsSubmitting(false);
-          return;
-        }
+        // 编辑模式：直接更新 JSON 文件
+        result = await cronApi.update(
+          editingJob.id,
+          form.name.trim(),
+          form.message.trim(),
+          form.scheduleType,
+          scheduleValue.trim(),
+          editingJob.enabled, // 保持原有启用状态
+          form.deliver || undefined,
+          form.to.trim() || undefined,
+          form.channel.trim() || undefined
+        );
+      } else {
+        // 添加模式：调用 nanobot cron add
+        result = await cronApi.add(
+          form.name.trim(),
+          form.message.trim(),
+          form.scheduleType,
+          scheduleValue.trim(),
+          form.deliver || undefined,
+          form.to.trim() || undefined,
+          form.channel.trim() || undefined
+        );
       }
 
-      const result = await cronApi.add(
-        form.name.trim(),
-        form.message.trim(),
-        form.scheduleType,
-        scheduleValue.trim(),
-      );
       if (result.success) {
         toast.showSuccess(editingJob ? t("cron.editSuccess") : t("cron.addSuccess"));
         setShowAddDialog(false);
         resetForm();
         await loadJobs();
       } else {
-        // 添加失败，尝试恢复旧任务
-        if (oldJobBackup && editingJob) {
-          try {
-            await cronApi.add(
-              oldJobBackup.name,
-              oldJobBackup.message,
-              "cron", // 使用默认类型
-              oldJobBackup.schedule,
-            );
-            toast.showError(t("cron.addFailed") + " - " + t("cron.oldJobRestored"));
-          } catch {
-            toast.showError(t("cron.addFailed") + " - " + t("cron.oldJobRestoreFailed"));
-          }
-        } else {
-          toast.showError(result.message || t("cron.addFailed"));
-        }
+        toast.showError(result.message || t("cron.addFailed"));
       }
     } catch (error) {
       toast.showError(t("cron.addFailed"));
@@ -185,7 +214,7 @@ export default function CronJobs() {
   }
 
   async function toggleJobEnabled(job: CronJob) {
-    const isEnabled = job.status === "enabled" || job.status === "active";
+    const isEnabled = job.enabled;
     try {
       const result = await cronApi.enable(job.id, isEnabled);
       if (result.success) {
@@ -196,19 +225,6 @@ export default function CronJobs() {
       }
     } catch (error) {
       toast.showError(t("cron.toggleFailed"));
-    }
-  }
-
-  async function handleRunJob(job: CronJob) {
-    try {
-      const result = await cronApi.run(job.id);
-      if (result.success) {
-        toast.showSuccess(t("cron.runSuccess"));
-      } else {
-        toast.showError(result.message || t("cron.runFailed"));
-      }
-    } catch (error) {
-      toast.showError(t("cron.runFailed"));
     }
   }
 
@@ -224,38 +240,47 @@ export default function CronJobs() {
       cronDow: "*",
       everySeconds: "3600",
       atTime: "",
+      deliver: false,
+      channel: "",
+      to: "",
     });
     setEditingJob(null);
   }
 
   function openEditDialog(job: CronJob) {
-    const schedule = job.schedule || "";
+    const schedule = job.schedule;
     let scheduleType: "cron" | "every" | "at" = "cron";
-    let cronMinute = "0", cronHour = "9", cronDom = "*", cronMonth = "*", cronDow = "*";
+    let cronMinute = "0",
+      cronHour = "9",
+      cronDom = "*",
+      cronMonth = "*",
+      cronDow = "*";
     let everySeconds = "3600";
     let atTime = "";
 
-    if (schedule.startsWith("every ")) {
+    if (schedule?.kind === "every") {
       scheduleType = "every";
-      // "every 30s" → extract seconds
-      const match = schedule.match(/every\s+(\d+)/);
-      if (match) everySeconds = match[1];
-    } else if (schedule.includes("*")) {
+      // everyMs 是毫秒，转换为秒
+      if (schedule.everyMs) {
+        everySeconds = String(Math.floor(schedule.everyMs / 1000));
+      }
+    } else if (schedule?.kind === "cron" && schedule.expr) {
       scheduleType = "cron";
-      const parts = schedule.trim().split(/\s+/);
+      const parts = schedule.expr.trim().split(/\s+/);
       if (parts.length === 5) {
         [cronMinute, cronHour, cronDom, cronMonth, cronDow] = parts;
       }
-    } else {
-      // Could be an "at" schedule or other format
+    } else if (schedule?.kind === "at" && schedule.atMs) {
       scheduleType = "at";
-      atTime = schedule;
+      // 转换时间戳为 datetime-local 格式
+      const date = new Date(schedule.atMs);
+      atTime = date.toISOString().slice(0, 16);
     }
 
     setEditingJob(job);
     setForm({
       name: job.name || "",
-      message: job.message || "",
+      message: job.payload?.message || "",
       scheduleType,
       cronMinute,
       cronHour,
@@ -264,12 +289,36 @@ export default function CronJobs() {
       cronDow,
       everySeconds,
       atTime,
+      deliver: job.payload?.deliver || false,
+      channel: job.payload?.channel || "",
+      to: job.payload?.to || "",
     });
     setShowAddDialog(true);
   }
 
   function getCronExpression(): string {
     return `${form.cronMinute} ${form.cronHour} ${form.cronDom} ${form.cronMonth} ${form.cronDow}`;
+  }
+
+  function describeSchedule(schedule: CronSchedule): string {
+    if (!schedule) return "-";
+
+    switch (schedule.kind) {
+      case "cron":
+        return describeCron(schedule.expr || "");
+      case "every":
+        if (schedule.everyMs) {
+          return describeIntervalMs(schedule.everyMs);
+        }
+        return "间隔执行";
+      case "at":
+        if (schedule.atMs) {
+          return `${formatTimestamp(schedule.atMs)} 执行一次`;
+        }
+        return "定时执行";
+      default:
+        return "-";
+    }
   }
 
   function describeCron(expression: string): string {
@@ -290,10 +339,18 @@ export default function CronJobs() {
     };
 
     const monNames: Record<string, string> = {
-      "1": t("cron.mon.jan"), "2": t("cron.mon.feb"), "3": t("cron.mon.mar"),
-      "4": t("cron.mon.apr"), "5": t("cron.mon.may"), "6": t("cron.mon.jun"),
-      "7": t("cron.mon.jul"), "8": t("cron.mon.aug"), "9": t("cron.mon.sep"),
-      "10": t("cron.mon.oct"), "11": t("cron.mon.nov"), "12": t("cron.mon.dec"),
+      "1": t("cron.mon.jan"),
+      "2": t("cron.mon.feb"),
+      "3": t("cron.mon.mar"),
+      "4": t("cron.mon.apr"),
+      "5": t("cron.mon.may"),
+      "6": t("cron.mon.jun"),
+      "7": t("cron.mon.jul"),
+      "8": t("cron.mon.aug"),
+      "9": t("cron.mon.sep"),
+      "10": t("cron.mon.oct"),
+      "11": t("cron.mon.nov"),
+      "12": t("cron.mon.dec"),
     };
 
     // Build time part
@@ -326,7 +383,10 @@ export default function CronJobs() {
       datePart = t("cron.desc.weekends");
     } else if (dom === "*" && mon === "*" && dow !== "*") {
       // Specific weekdays
-      const days = dow.split(",").map(d => dowNames[d] || d).join(", ");
+      const days = dow
+        .split(",")
+        .map((d) => dowNames[d] || d)
+        .join(", ");
       datePart = t("cron.desc.onDow", { days });
     } else if (dom !== "*" && mon === "*" && dow === "*") {
       datePart = t("cron.desc.onDom", { day: dom });
@@ -336,10 +396,14 @@ export default function CronJobs() {
     } else {
       // Fallback for complex combinations
       const segments: string[] = [];
-      if (mon !== "*") segments.push(monNames[mon] || `${mon}${t("cron.desc.monthSuffix")}`);
+      if (mon !== "*")
+        segments.push(monNames[mon] || `${mon}${t("cron.desc.monthSuffix")}`);
       if (dom !== "*") segments.push(`${dom}${t("cron.desc.daySuffix")}`);
       if (dow !== "*") {
-        const days = dow.split(",").map(d => dowNames[d] || d).join(", ");
+        const days = dow
+          .split(",")
+          .map((d) => dowNames[d] || d)
+          .join(", ");
         segments.push(days);
       }
       datePart = segments.join(" ");
@@ -352,6 +416,14 @@ export default function CronJobs() {
     return `${datePart} ${timePart} ${t("cron.desc.execute")}`;
   }
 
+  function describeIntervalMs(ms: number): string {
+    const seconds = Math.floor(ms / 1000);
+    if (seconds < 60) return t("cron.descriptions.everyNSeconds", { n: seconds });
+    if (seconds < 3600) return t("cron.descriptions.everyNMinutes", { n: Math.floor(seconds / 60) });
+    if (seconds < 86400) return t("cron.descriptions.everyNHours", { n: Math.floor(seconds / 3600) });
+    return t("cron.descriptions.everyNDays", { n: Math.floor(seconds / 86400) });
+  }
+
   function describeInterval(schedule: string): string {
     // Parse formats: "every 30s", "every 3600s", "30", "3600", "every 5m", "every 2h"
     let s: number;
@@ -359,7 +431,14 @@ export default function CronJobs() {
     if (everyMatch) {
       const val = parseInt(everyMatch[1], 10);
       const unit = (everyMatch[2] || "s").toLowerCase();
-      s = unit === "m" ? val * 60 : unit === "h" ? val * 3600 : unit === "d" ? val * 86400 : val;
+      s =
+        unit === "m"
+          ? val * 60
+          : unit === "h"
+          ? val * 3600
+          : unit === "d"
+          ? val * 86400
+          : val;
     } else {
       s = parseInt(schedule, 10);
     }
@@ -368,6 +447,20 @@ export default function CronJobs() {
     if (s < 3600) return t("cron.descriptions.everyNMinutes", { n: Math.floor(s / 60) });
     if (s < 86400) return t("cron.descriptions.everyNHours", { n: Math.floor(s / 3600) });
     return t("cron.descriptions.everyNDays", { n: Math.floor(s / 86400) });
+  }
+
+  // 获取渠道显示名称
+  function getChannelDisplayName(channel: string | null): string {
+    if (!channel) return "-";
+    const channelNames: Record<string, string> = {
+      feishu: "飞书",
+      wecom: "企业微信",
+      dingtalk: "钉钉",
+      slack: "Slack",
+      telegram: "Telegram",
+      email: "邮件",
+    };
+    return channelNames[channel] || channel;
   }
 
   return (
@@ -406,11 +499,12 @@ export default function CronJobs() {
       <div className="flex-1 min-h-0 overflow-y-auto p-6 scrollbar-thin">
         {/* 重启提示 */}
         <div className="max-w-4xl mx-auto mb-4">
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-lg">
-            <AlertTriangle className="w-4 h-4 text-amber-500 dark:text-amber-400 flex-shrink-0" />
-            <p className="text-sm text-amber-700 dark:text-amber-300">
-              {t("cron.restartHint")}
-            </p>
+          <div className="flex items-start gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-lg">
+            <AlertTriangle className="w-4 h-4 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
+              <p>{t("cron.restartHint")}</p>
+              <p className="text-amber-600 dark:text-amber-400">{t("cron.chatHint")}</p>
+            </div>
           </div>
         </div>
 
@@ -425,119 +519,161 @@ export default function CronJobs() {
             description={t("cron.noJobsDesc")}
           />
         ) : (
-          <div className="max-w-4xl mx-auto space-y-3">
+          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-3">
             {jobs.map((job, idx) => {
-              const isEnabled = job.status === "enabled" || job.status === "active";
-              const isCronExpr = job.schedule.includes("*");
-              const scheduleDesc = isCronExpr
-                ? describeCron(job.schedule)
-                : describeInterval(job.schedule);
+              const isEnabled = job.enabled;
+              const scheduleDesc = describeSchedule(job.schedule);
+              const nextRunRelative = formatRelativeTime(job.state?.nextRunAtMs || null);
+              const lastRun = formatTimestamp(job.state?.lastRunAtMs || null);
+              const lastStatus = job.state?.lastStatus;
+              const lastError = job.state?.lastError;
 
               return (
                 <div
                   key={job.id || idx}
-                  className={`group relative bg-white dark:bg-dark-bg-card rounded-xl border overflow-hidden transition-all hover:shadow-md ${
+                  className={`group rounded-lg border transition-all hover:shadow-md ${
                     isEnabled
-                      ? "border-gray-200 dark:border-dark-border-subtle hover:border-blue-200 dark:hover:border-blue-500/40"
-                      : "border-gray-200/70 dark:border-dark-border-subtle/50 opacity-75 hover:opacity-100"
+                      ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-500/50"
+                      : "bg-white dark:bg-dark-bg-card border-gray-200 dark:border-dark-border-subtle hover:border-gray-300 dark:hover:border-dark-border-default opacity-80 hover:opacity-100"
                   }`}
                 >
-                  {/* 左侧状态指示条 */}
-                  <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${
-                    isEnabled
-                      ? "bg-green-500 dark:bg-green-400"
-                      : "bg-gray-300 dark:bg-gray-600"
-                  }`} />
-
-                  <div className="pl-5 pr-4 py-4">
-                    {/* 上部：名称 + 状态 + 调度 */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <h3 className="font-semibold text-gray-900 dark:text-dark-text-primary truncate text-[15px]">
-                          {job.name || job.id}
-                        </h3>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0 ${
+                  <div className="p-4">
+                    {/* 上部：图标 + 名称 + 状态 */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className={`p-2 rounded-lg flex-shrink-0 ${
                           isEnabled
-                            ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 ring-1 ring-green-200/60 dark:ring-green-500/30"
-                            : "bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 ring-1 ring-gray-200/60 dark:ring-gray-600/30"
+                            ? "bg-green-100 dark:bg-green-800/40"
+                            : "bg-gray-100 dark:bg-dark-bg-hover"
                         }`}>
-                          {isEnabled ? t("cron.enabled") : t("cron.disabled")}
-                        </span>
+                          <CalendarClock className={`w-5 h-5 ${
+                            isEnabled
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-gray-500 dark:text-dark-text-muted"
+                          }`} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold text-gray-900 dark:text-dark-text-primary text-sm truncate">
+                              {job.name || job.id}
+                            </h3>
+                            {isEnabled ? (
+                              <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full flex-shrink-0">
+                                {t("config.enabled")}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-gray-100 dark:bg-dark-bg-hover text-gray-600 dark:text-dark-text-muted text-xs rounded-full flex-shrink-0">
+                                {t("config.notEnabled")}
+                              </span>
+                            )}
+                          </div>
+                          {/* 投递状态 */}
+                          {job.payload?.deliver && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <Bell className="w-3 h-3 text-purple-500 dark:text-purple-400" />
+                              <span className="text-xs text-purple-600 dark:text-purple-400">
+                                {getChannelDisplayName(job.payload.channel)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      {/* 操作按钮 */}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
                         <button
                           onClick={() => toggleJobEnabled(job)}
                           className={`p-1.5 rounded-md transition-colors ${
                             isEnabled
-                              ? "text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
+                              ? "text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30"
                               : "text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-bg-hover"
                           }`}
                           title={isEnabled ? t("cron.disable") : t("cron.enable")}
                         >
-                          {isEnabled ? <Power className="w-3.5 h-3.5" /> : <PowerOff className="w-3.5 h-3.5" />}
-                        </button>
-                        <button
-                          onClick={() => handleRunJob(job)}
-                          className="p-1.5 text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors"
-                          title={t("cron.runJob")}
-                        >
-                          <Play className="w-3.5 h-3.5" />
+                          {isEnabled ? (
+                            <Power className="w-4 h-4" />
+                          ) : (
+                            <PowerOff className="w-4 h-4" />
+                          )}
                         </button>
                         <button
                           onClick={() => openEditDialog(job)}
                           className="p-1.5 text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-md transition-colors"
                           title={t("cron.editJob")}
                         >
-                          <Pencil className="w-3.5 h-3.5" />
+                          <Pencil className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => confirmRemoveJob(job)}
                           className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors"
                           title={t("cron.removeJob")}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
 
-                    {/* 调度信息 - 突出显示 */}
-                    <div className="flex items-center gap-2 mb-2.5">
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50/80 dark:bg-blue-900/15 rounded-md">
-                        <Timer className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
-                        <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                          {scheduleDesc}
-                        </span>
-                      </div>
-                      {isCronExpr && (
-                        <code className="text-[11px] text-gray-400 dark:text-dark-text-muted font-mono">
-                          {job.schedule}
+                    {/* 调度信息 */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <Timer className={`w-3.5 h-3.5 flex-shrink-0 ${
+                        isEnabled
+                          ? "text-green-500 dark:text-green-400"
+                          : "text-gray-400 dark:text-dark-text-muted"
+                      }`} />
+                      <span className={`text-sm font-medium truncate ${
+                        isEnabled
+                          ? "text-green-700 dark:text-green-300"
+                          : "text-gray-600 dark:text-dark-text-secondary"
+                      }`}>
+                        {scheduleDesc}
+                      </span>
+                      {job.schedule?.kind === "cron" && job.schedule.expr && (
+                        <code className="text-[10px] text-gray-400 dark:text-dark-text-muted font-mono flex-shrink-0">
+                          ({job.schedule.expr})
                         </code>
                       )}
                     </div>
 
                     {/* 消息内容 */}
-                    {job.message && (
-                      <div className="flex items-start gap-2 mb-2.5">
+                    {job.payload?.message && (
+                      <div className="flex items-start gap-2 mb-2">
                         <MessageSquare className="w-3.5 h-3.5 text-gray-400 dark:text-dark-text-muted flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-gray-600 dark:text-dark-text-secondary break-words line-clamp-2 leading-relaxed">
-                          {job.message}
+                        <p className="text-xs text-gray-600 dark:text-dark-text-secondary break-words line-clamp-2 leading-relaxed">
+                          {job.payload.message}
                         </p>
                       </div>
                     )}
 
                     {/* 底部元信息 */}
-                    <div className="flex items-center gap-3 text-[11px] text-gray-400 dark:text-dark-text-muted">
-                      <span className="font-mono">{job.id}</span>
-                      {job.next_run && (
-                        <>
-                          <span className="text-gray-300 dark:text-gray-600">|</span>
-                          <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-400 dark:text-dark-text-muted pt-2 border-t border-gray-200/50 dark:border-dark-border-subtle/50">
+                      {/* 下次执行时间 */}
+                      {job.state?.nextRunAtMs && (
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>{t("cron.nextRun")}: {nextRunRelative}</span>
+                        </div>
+                      )}
+
+                      {/* 上次执行状态 */}
+                      {lastRun !== "-" && (
+                        <div className="flex items-center gap-1">
+                          {lastStatus === "success" ? (
+                            <CheckCircle className="w-3 h-3 text-green-500" />
+                          ) : lastStatus === "failed" ? (
+                            <XCircle className="w-3 h-3 text-red-500" />
+                          ) : (
                             <Clock className="w-3 h-3" />
-                            <span>{t("cron.nextRun")}: {job.next_run}</span>
-                          </div>
-                        </>
+                          )}
+                          <span>{t("cron.lastRun")}: {lastRun}</span>
+                        </div>
                       )}
                     </div>
+
+                    {/* 错误信息 */}
+                    {lastError && (
+                      <div className="mt-2 px-2 py-1.5 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/40 rounded-md">
+                        <p className="text-xs text-red-600 dark:text-red-400">{lastError}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -549,10 +685,14 @@ export default function CronJobs() {
       {/* 添加任务对话框 */}
       {showAddDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-dark-bg-card rounded-xl shadow-xl max-w-lg w-full p-6 mx-4 transition-colors duration-200">
+          <div className="bg-white dark:bg-dark-bg-card rounded-xl shadow-xl max-w-lg w-full p-6 mx-4 transition-colors duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${editingJob ? "bg-amber-50 dark:bg-amber-900/30" : "bg-blue-50 dark:bg-blue-900/30"}`}>
+                <div
+                  className={`p-2 rounded-lg ${
+                    editingJob ? "bg-amber-50 dark:bg-amber-900/30" : "bg-blue-50 dark:bg-blue-900/30"
+                  }`}
+                >
                   {editingJob ? (
                     <Pencil className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                   ) : (
@@ -564,7 +704,10 @@ export default function CronJobs() {
                 </h3>
               </div>
               <button
-                onClick={() => { setShowAddDialog(false); resetForm(); }}
+                onClick={() => {
+                  setShowAddDialog(false);
+                  resetForm();
+                }}
                 className="p-1.5 hover:bg-gray-100 dark:hover:bg-dark-bg-hover rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-gray-500 dark:text-dark-text-muted" />
@@ -651,13 +794,38 @@ export default function CronJobs() {
                   </label>
                   {/* 五字段输入 */}
                   <div className="grid grid-cols-5 gap-2">
-                    {([
-                      { key: "cronMinute" as const, label: t("cron.field.minute"), placeholder: "0", hint: "0-59, *, */n" },
-                      { key: "cronHour" as const, label: t("cron.field.hour"), placeholder: "9", hint: "0-23, *, */n" },
-                      { key: "cronDom" as const, label: t("cron.field.dom"), placeholder: "*", hint: "1-31, *" },
-                      { key: "cronMonth" as const, label: t("cron.field.month"), placeholder: "*", hint: "1-12, *" },
-                      { key: "cronDow" as const, label: t("cron.field.dow"), placeholder: "*", hint: "0-7, 1-5" },
-                    ]).map((field) => (
+                    {[
+                      {
+                        key: "cronMinute" as const,
+                        label: t("cron.field.minute"),
+                        placeholder: "0",
+                        hint: "0-59, *, */n",
+                      },
+                      {
+                        key: "cronHour" as const,
+                        label: t("cron.field.hour"),
+                        placeholder: "9",
+                        hint: "0-23, *, */n",
+                      },
+                      {
+                        key: "cronDom" as const,
+                        label: t("cron.field.dom"),
+                        placeholder: "*",
+                        hint: "1-31, *",
+                      },
+                      {
+                        key: "cronMonth" as const,
+                        label: t("cron.field.month"),
+                        placeholder: "*",
+                        hint: "1-12, *",
+                      },
+                      {
+                        key: "cronDow" as const,
+                        label: t("cron.field.dow"),
+                        placeholder: "*",
+                        hint: "0-7, 1-5",
+                      },
+                    ].map((field) => (
                       <div key={field.key} className="flex flex-col">
                         <span className="text-xs font-medium text-gray-500 dark:text-dark-text-muted mb-1 text-center">
                           {field.label}
@@ -725,12 +893,68 @@ export default function CronJobs() {
                     <div className="flex items-center gap-2">
                       <Timer className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
                       <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                        {form.atTime ? t("cron.runOnceAt", { time: form.atTime.replace("T", " ") }) : t("cron.selectTime")}
+                        {form.atTime
+                          ? t("cron.runOnceAt", { time: form.atTime.replace("T", " ") })
+                          : t("cron.selectTime")}
                       </span>
                     </div>
                   </div>
                 </div>
               )}
+
+              {/* 推送配置 */}
+              <div className="border-t border-gray-200 dark:border-dark-border-subtle pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <input
+                    type="checkbox"
+                    id="deliver"
+                    checked={form.deliver}
+                    onChange={(e) => setForm({ ...form, deliver: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label
+                    htmlFor="deliver"
+                    className="text-sm font-medium text-gray-700 dark:text-dark-text-secondary"
+                  >
+                    {t("cron.enableDeliver")}
+                  </label>
+                </div>
+
+                {form.deliver && (
+                  <div className="grid grid-cols-2 gap-3 pl-6">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-dark-text-muted mb-1">
+                        {t("cron.channel")}
+                      </label>
+                      <select
+                        value={form.channel}
+                        onChange={(e) => setForm({ ...form, channel: e.target.value })}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary"
+                      >
+                        <option value="">{t("cron.selectChannel")}</option>
+                        <option value="feishu">飞书</option>
+                        <option value="wecom">企业微信</option>
+                        <option value="dingtalk">钉钉</option>
+                        <option value="slack">Slack</option>
+                        <option value="telegram">Telegram</option>
+                        <option value="email">邮件</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-dark-text-muted mb-1">
+                        {t("cron.recipient")}
+                      </label>
+                      <input
+                        type="text"
+                        value={form.to}
+                        onChange={(e) => setForm({ ...form, to: e.target.value })}
+                        placeholder={t("cron.recipientPlaceholder")}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* 投递提示 */}
               <div className="px-3 py-2.5 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg">
@@ -746,7 +970,10 @@ export default function CronJobs() {
             {/* 操作按钮 */}
             <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => { setShowAddDialog(false); resetForm(); }}
+                onClick={() => {
+                  setShowAddDialog(false);
+                  resetForm();
+                }}
                 className="px-4 py-2 bg-gray-100 dark:bg-dark-bg-hover hover:bg-gray-200 dark:hover:bg-dark-bg-active text-gray-700 dark:text-dark-text-primary rounded-lg transition-colors text-sm font-medium"
               >
                 {t("cron.cancel")}
@@ -757,8 +984,12 @@ export default function CronJobs() {
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors text-sm font-medium"
               >
                 {isSubmitting
-                  ? (editingJob ? t("cron.saving") : t("cron.adding"))
-                  : (editingJob ? t("cron.save") : t("cron.confirm"))}
+                  ? editingJob
+                    ? t("cron.saving")
+                    : t("cron.adding")
+                  : editingJob
+                  ? t("cron.save")
+                  : t("cron.confirm")}
               </button>
             </div>
           </div>

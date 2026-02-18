@@ -25,6 +25,7 @@ async fn main() {
     env_logger::init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .manage(AppState {
             config_path: Mutex::new(None),
             nanobot_process: Mutex::new(None),
@@ -122,6 +123,7 @@ async fn main() {
             // Cron commands
             cron::cron_list,
             cron::cron_add,
+            cron::cron_update,
             cron::cron_remove,
             cron::cron_enable,
             cron::cron_run,

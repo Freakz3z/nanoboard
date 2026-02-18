@@ -69,9 +69,11 @@ export interface DashboardConfig {
 }
 
 export interface DiagnosisCheck {
+  key: string;
   name: string;
   status: "ok" | "warning" | "error";
   message: string;
+  message_key: string;
   details?: string;
 }
 

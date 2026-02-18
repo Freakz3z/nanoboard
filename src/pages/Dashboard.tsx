@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { processApi, configApi, networkApi } from "../lib/tauri";
-import { useToast } from "../contexts/ToastContext";
+import { processApi, networkApi } from "../lib/tauri";
 
 // 导入类型
 import type {
@@ -11,30 +10,21 @@ import type {
   LogStatistics,
   NetworkData,
   DashboardConfig,
-  DiagnosisResult,
 } from "@/types/dashboard";
 
 // 导入组件
 import StatusCards from "@/components/dashboard/StatusCards";
 import ConfigOverviewCards from "@/components/dashboard/ConfigOverviewCards";
 import SystemResourceCards from "@/components/dashboard/SystemResourceCards";
-import SystemInfoSection from "@/components/dashboard/SystemInfoSection";
 
 export default function Dashboard() {
   const { t } = useTranslation();
-  const toast = useToast();
   const [status, setStatus] = useState<Status>({ running: false });
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [nanobotVersion, setNanobotVersion] = useState<NanobotVersion | null>(null);
-  const [nanobotPath, setNanobotPath] = useState<string | null>(null);
   const [config, setConfig] = useState<DashboardConfig | null>(null);
   const [logStatistics, setLogStatistics] = useState<LogStatistics | null>(null);
   const [networkData, setNetworkData] = useState<NetworkData[]>([]);
-  const [diagnosing, setDiagnosing] = useState(false);
-  const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResult | null>(null);
-  const [showDiagnosis, setShowDiagnosis] = useState(false);
-  const [installingWithUv, setInstallingWithUv] = useState(false);
-  const [installingWithPip, setInstallingWithPip] = useState(false);
 
   // 使用合并 API 刷新所有状态
   async function refreshAll() {
@@ -90,7 +80,6 @@ export default function Dashboard() {
     // 初始加载
     refreshAll();
     loadNanobotVersion();
-    loadNanobotPath();
 
     // 初始化网络监控
     networkApi.initMonitor().catch(console.error);
@@ -142,119 +131,6 @@ export default function Dashboard() {
     }
   }
 
-  async function loadNanobotPath() {
-    try {
-      const result = await processApi.getNanobotPath();
-      if (result.found && result.path) {
-        setNanobotPath(result.path);
-      }
-    } catch (error) {
-      console.error(t("dashboard.fetchNanobotPathFailed"), error);
-    }
-  }
-
-  async function loadConfig() {
-    try {
-      const result = await configApi.load();
-      if (!result.error) {
-        setConfig(result);
-      }
-    } catch (error) {
-      console.error(t("dashboard.fetchConfigFailed"), error);
-    }
-  }
-
-  // 运行环境诊断
-  async function runDiagnosis() {
-    setDiagnosing(true);
-    try {
-      const result = await processApi.diagnose();
-      setDiagnosisResult(result);
-      setShowDiagnosis(true);
-    } catch (error) {
-      console.error(t("dashboard.diagnosisFailed"), error);
-      setDiagnosisResult({
-        overall: "failed",
-        checks: [{
-          name: t("dashboard.diagnosis"),
-          status: "error",
-          message: t("dashboard.diagnosisFailed") + (error as Error).message,
-        }]
-      });
-      setShowDiagnosis(true);
-    } finally {
-      setDiagnosing(false);
-    }
-  }
-
-  // 使用 uv 下载并初始化 nanobot
-  async function downloadWithUvAndInit() {
-    setInstallingWithUv(true);
-    try {
-      // 1. 使用 uv 下载安装
-      toast.showInfo(t("dashboard.installingWithUvDesc"));
-      const downloadResult = await processApi.downloadWithUv();
-      if (downloadResult.status !== "success") {
-        toast.showError(t("dashboard.installFailed") + downloadResult.message);
-        return;
-      }
-      toast.showSuccess(t("dashboard.installSuccessWithUv"));
-
-      // 2. 初始化
-      toast.showInfo(t("dashboard.initializingNanobot"));
-      const onboardResult = await processApi.onboard();
-      if (onboardResult.status === "success") {
-        toast.showSuccess(t("dashboard.nanobotInitialized"));
-      } else {
-        toast.showError(t("dashboard.initializeFailed") + onboardResult.message);
-      }
-
-      // 3. 刷新状态
-      await loadNanobotVersion();
-      await loadNanobotPath();
-      await loadConfig();
-    } catch (error) {
-      console.error(t("dashboard.operationFailed"), error);
-      toast.showError(t("dashboard.operationFailedToast") + (error as Error).message);
-    } finally {
-      setInstallingWithUv(false);
-    }
-  }
-
-  // 使用 pip 下载并初始化 nanobot
-  async function downloadWithPipAndInit() {
-    setInstallingWithPip(true);
-    try {
-      // 1. 使用 pip 下载安装
-      toast.showInfo(t("dashboard.installingWithPipDesc"));
-      const downloadResult = await processApi.download();
-      if (downloadResult.status !== "success") {
-        toast.showError(t("dashboard.installFailed") + downloadResult.message);
-        return;
-      }
-      toast.showSuccess(t("dashboard.installSuccessWithPip"));
-
-      // 2. 初始化
-      toast.showInfo(t("dashboard.initializingNanobot"));
-      const onboardResult = await processApi.onboard();
-      if (onboardResult.status === "success") {
-        toast.showSuccess(t("dashboard.nanobotInitialized"));
-      } else {
-        toast.showError(t("dashboard.initializeFailed") + onboardResult.message);
-      }
-
-      // 3. 刷新状态
-      await loadNanobotVersion();
-      await loadNanobotPath();
-      await loadConfig();
-    } catch (error) {
-      console.error(t("dashboard.operationFailed"), error);
-      toast.showError(t("dashboard.operationFailedToast") + (error as Error).message);
-    } finally {
-      setInstallingWithPip(false);
-    }
-  }
-
   return (
     <div className="flex-1 overflow-y-auto p-8 scrollbar-thin bg-white dark:bg-dark-bg-base transition-colors duration-200">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -269,20 +145,6 @@ export default function Dashboard() {
           systemInfo={systemInfo}
           logStatistics={logStatistics}
           networkData={networkData}
-        />
-
-        {/* 系统信息 */}
-        <SystemInfoSection
-          nanobotPath={nanobotPath}
-          installingWithUv={installingWithUv}
-          installingWithPip={installingWithPip}
-          diagnosing={diagnosing}
-          showDiagnosis={showDiagnosis}
-          diagnosisResult={diagnosisResult}
-          onDownloadWithUv={downloadWithUvAndInit}
-          onDownloadWithPip={downloadWithPipAndInit}
-          onRunDiagnosis={runDiagnosis}
-          onCloseDiagnosis={() => setShowDiagnosis(false)}
         />
       </div>
     </div>
