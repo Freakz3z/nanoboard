@@ -19,7 +19,6 @@ import {
   MessageSquare,
   Inbox,
   History,
-  RotateCcw,
   Copy,
   FolderOpen,
   Code,
@@ -27,6 +26,8 @@ import {
   Plug,
   Terminal,
   Globe,
+  FileText,
+  Wrench,
 } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -87,7 +88,7 @@ export default function ConfigEditor() {
         console.error("Failed to load expanded sections:", e);
       }
     }
-    return new Set(["providers", "channels", "mcp", "security"]);
+    return new Set(["providers", "channels", "mcp", "tools", "security"]);
   });
   const [editingProvider, setEditingProvider] = useState<{
     isOpen: boolean;
@@ -496,6 +497,57 @@ export default function ConfigEditor() {
     }
   }
 
+  // 更新 tools.exec 配置
+  async function updateToolsExecConfig(field: string, value: any) {
+    const updatedConfig = {
+      ...config,
+      tools: {
+        ...config.tools,
+        exec: {
+          ...config.tools?.exec,
+          [field]: value,
+        },
+      },
+    };
+    setConfig(updatedConfig);
+
+    try {
+      const configToSave = cleanConfigForSave(updatedConfig);
+      await configApi.save(configToSave);
+      setOriginalConfig(updatedConfig);
+      setCode(JSON.stringify(updatedConfig, null, 2));
+    } catch (error) {
+      toast.showError(t("config.autoSaveFailed"));
+    }
+  }
+
+  // 更新 tools.web.search 配置
+  async function updateToolsWebSearchConfig(field: string, value: any) {
+    const updatedConfig = {
+      ...config,
+      tools: {
+        ...config.tools,
+        web: {
+          ...config.tools?.web,
+          search: {
+            ...config.tools?.web?.search,
+            [field]: value,
+          },
+        },
+      },
+    };
+    setConfig(updatedConfig);
+
+    try {
+      const configToSave = cleanConfigForSave(updatedConfig);
+      await configApi.save(configToSave);
+      setOriginalConfig(updatedConfig);
+      setCode(JSON.stringify(updatedConfig, null, 2));
+    } catch (error) {
+      toast.showError(t("config.autoSaveFailed"));
+    }
+  }
+
   // MCP Server 相关函数
   async function saveMcpServer(serverId: string, server: McpServer) {
     const updatedConfig = {
@@ -730,18 +782,19 @@ export default function ConfigEditor() {
                 onClick={() => {
                   setConfirmDialog({
                     isOpen: true,
-                    title: t("config.restoreDefaultConfig"),
-                    message: t("config.restoreDefaultConfirm"),
+                    title: t("config.initConfigTitle"),
+                    message: t("config.initConfigConfirm"),
                     onConfirm: async () => {
                       try {
-                        // 恢复到默认配置并直接保存到文件
+                        // 初始化配置并直接保存到文件
                         await configApi.save(DEFAULT_CONFIG);
-                        setConfig(DEFAULT_CONFIG);
-                        setOriginalConfig(DEFAULT_CONFIG);
+                        const initConfig = DEFAULT_CONFIG as unknown as Config;
+                        setConfig(initConfig);
+                        setOriginalConfig(initConfig);
                         setCode(JSON.stringify(DEFAULT_CONFIG, null, 2));
-                        toast.showSuccess(t("config.restoredDefault"));
+                        toast.showSuccess(t("config.initConfigSuccess"));
                       } catch (error) {
-                        toast.showError(t("config.restoreDefaultFailed"));
+                        toast.showError(t("config.initConfigFailed"));
                       } finally {
                         setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => {} });
                       }
@@ -750,8 +803,8 @@ export default function ConfigEditor() {
                 }}
                 className="flex items-center gap-2 px-3 py-2 bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 rounded-lg font-medium text-amber-700 dark:text-amber-400 transition-colors text-sm"
               >
-                <RotateCcw className="w-4 h-4" />
-                {t("config.restoreDefault")}
+                <FileText className="w-4 h-4" />
+                {t("config.initConfig")}
               </button>
               <button
                 onClick={() => setShowHistory(!showHistory)}
@@ -1206,6 +1259,103 @@ export default function ConfigEditor() {
                     description={t("mcp.noServersDesc")}
                   />
                 )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Tools 配置 */}
+        <div className="bg-white dark:bg-dark-bg-card rounded-lg border border-gray-200 dark:border-dark-border-subtle overflow-hidden transition-colors duration-200">
+          <button
+            onClick={() => toggleSection("tools")}
+            className="w-full p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-dark-bg-hover transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
+                <Wrench className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary">
+                {t("config.toolsConfig")}
+              </h2>
+            </div>
+            {expandedSections.has("tools") ? (
+              <ChevronUp className="w-5 h-5 text-gray-400 dark:text-dark-text-muted" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-400 dark:text-dark-text-muted" />
+            )}
+          </button>
+
+          {expandedSections.has("tools") && (
+            <div className="p-5 pt-0 space-y-6">
+              {/* Exec 配置 */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-dark-text-secondary flex items-center gap-2">
+                  <Terminal className="w-4 h-4" />
+                  {t("config.execConfig")}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
+                      {t("config.execTimeout")}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        value={config.tools?.exec?.timeout ?? 60}
+                        onChange={(e) => updateToolsExecConfig("timeout", parseInt(e.target.value) || 60)}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary"
+                      />
+                      <span className="text-sm text-gray-500 dark:text-dark-text-muted whitespace-nowrap">
+                        {t("config.seconds")}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 dark:text-dark-text-muted mt-1">
+                      {t("config.execTimeoutDesc")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Web Search 配置 */}
+              <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-dark-border-subtle">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-dark-text-secondary flex items-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  {t("config.webSearchConfig")}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
+                      {t("config.webSearchApiKey")}
+                    </label>
+                    <input
+                      type="password"
+                      value={config.tools?.web?.search?.apiKey || ""}
+                      onChange={(e) => updateToolsWebSearchConfig("apiKey", e.target.value)}
+                      placeholder={t("config.apiKeyPlaceholder")}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted"
+                    />
+                    <p className="text-xs text-gray-400 dark:text-dark-text-muted mt-1">
+                      {t("config.webSearchApiKeyDesc")}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
+                      {t("config.webSearchMaxResults")}
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={config.tools?.web?.search?.maxResults ?? 5}
+                      onChange={(e) => updateToolsWebSearchConfig("maxResults", parseInt(e.target.value) || 5)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary"
+                    />
+                    <p className="text-xs text-gray-400 dark:text-dark-text-muted mt-1">
+                      {t("config.webSearchMaxResultsDesc")}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           )}

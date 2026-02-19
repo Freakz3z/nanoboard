@@ -51,6 +51,7 @@ export const processApi = {
   getVersion: () => invoke<AnyResponse>("get_nanobot_version"),
   getNanobotPath: () => invoke<NanobotPath>("get_nanobot_path"),
   providerLogin: (provider: string) => invoke<OperationResult>("provider_login", { provider }),
+  checkOAuthToken: (provider: string) => invoke<{ has_token: boolean; is_expired?: boolean; message: string }>("check_oauth_token", { provider }),
   checkConfig: () => invoke<ConfigCheckResult>("check_nanobot_config"),
   diagnose: () => invoke<DiagnosticResult>("diagnose_nanobot"),
 };

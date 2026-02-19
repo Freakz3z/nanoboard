@@ -1162,6 +1162,176 @@ pub async fn get_nanobot_path() -> Result<serde_json::Value, String> {
     }
 }
 
+/// 检查 OAuth Provider 的 token 是否存在
+/// OAuth token 存储在系统应用数据目录中，由 oauth-cli-kit 管理
+#[tauri::command]
+pub async fn check_oauth_token(provider: String) -> Result<serde_json::Value, String> {
+    // OAuth token 由 oauth-cli-kit 库管理
+    // 存储位置：
+    // - macOS: ~/Library/Application Support/oauth-cli-kit/auth/{provider}.json
+    // - Linux: ~/.local/share/oauth-cli-kit/auth/{provider}.json
+    // - Windows: %APPDATA%/oauth-cli-kit/auth/{provider}.json
+    // 也可以从 ~/.codex/auth.json 导入（针对 openai-codex）
+
+    let home_dir = match dirs::home_dir() {
+        Some(dir) => dir,
+        None => {
+            return Ok(json!({
+                "has_token": false,
+                "message": "无法找到用户主目录"
+            }));
+        }
+    };
+
+    // 检查多个可能的 token 位置
+    let token_paths = get_oauth_token_paths(&home_dir, &provider);
+
+    for token_path in token_paths {
+        if token_path.exists() {
+            // 尝试读取并验证 token 文件
+            if let Ok(content) = std::fs::read_to_string(&token_path) {
+                if let Ok(token_data) = serde_json::from_str::<serde_json::Value>(&content) {
+                    // 检查是否有 access token
+                    let has_access = token_data.get("access")
+                        .and_then(|v| v.as_str())
+                        .map(|s| !s.is_empty())
+                        .unwrap_or(false);
+
+                    if has_access {
+                        // 检查 token 是否过期
+                        let is_expired = token_data.get("expires")
+                            .and_then(|v| v.as_i64())
+                            .map(|expires| {
+                                let now = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_millis() as i64;
+                                expires < now
+                            })
+                            .unwrap_or(false);
+
+                        return Ok(json!({
+                            "has_token": true,
+                            "is_expired": is_expired,
+                            "message": if is_expired { "Token 已过期，请重新登录" } else { "Token 有效" },
+                            "provider": provider
+                        }));
+                    }
+                }
+            }
+        }
+    }
+
+    // 对于 openai-codex，也检查 ~/.codex/auth.json
+    if provider == "openai-codex" {
+        let codex_auth_path = home_dir.join(".codex").join("auth.json");
+        if codex_auth_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&codex_auth_path) {
+                if let Ok(auth_data) = serde_json::from_str::<serde_json::Value>(&content) {
+                    let tokens = auth_data.get("tokens");
+                    if let Some(tokens_obj) = tokens {
+                        let has_access = tokens_obj.get("access_token")
+                            .and_then(|v| v.as_str())
+                            .map(|s| !s.is_empty())
+                            .unwrap_or(false);
+
+                        if has_access {
+                            return Ok(json!({
+                                "has_token": true,
+                                "is_expired": false,
+                                "message": "从 Codex CLI 导入的 token",
+                                "provider": provider,
+                                "source": "codex_cli"
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(json!({
+        "has_token": false,
+        "message": "未找到 OAuth token，请先登录",
+        "provider": provider
+    }))
+}
+
+/// 获取 OAuth token 可能的存储路径
+fn get_oauth_token_paths(home_dir: &std::path::Path, provider: &str) -> Vec<std::path::PathBuf> {
+    let mut paths = Vec::new();
+
+    // 将 provider 名称转换为文件名格式
+    // 例如: "openai-codex" -> "openai_codex_oauth.json" 或 "oauth.json"
+    let provider_filename = provider.replace("-", "_");
+
+    // macOS: ~/Library/Application Support/oauth-cli-kit/auth/
+    #[cfg(target_os = "macos")]
+    {
+        let macos_path = home_dir
+            .join("Library")
+            .join("Application Support")
+            .join("oauth-cli-kit")
+            .join("auth")
+            .join(format!("{}_oauth.json", provider_filename));
+        paths.push(macos_path);
+
+        // 也检查默认的 oauth.json
+        let default_path = home_dir
+            .join("Library")
+            .join("Application Support")
+            .join("oauth-cli-kit")
+            .join("auth")
+            .join("oauth.json");
+        paths.push(default_path);
+    }
+
+    // Linux: ~/.local/share/oauth-cli-kit/auth/
+    #[cfg(target_os = "linux")]
+    {
+        let linux_path = home_dir
+            .join(".local")
+            .join("share")
+            .join("oauth-cli-kit")
+            .join("auth")
+            .join(format!("{}_oauth.json", provider_filename));
+        paths.push(linux_path);
+
+        let default_path = home_dir
+            .join(".local")
+            .join("share")
+            .join("oauth-cli-kit")
+            .join("auth")
+            .join("oauth.json");
+        paths.push(default_path);
+    }
+
+    // Windows: %APPDATA%/oauth-cli-kit/auth/
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let win_path = std::path::PathBuf::from(appdata)
+                .join("oauth-cli-kit")
+                .join("auth")
+                .join(format!("{}_oauth.json", provider_filename));
+            paths.push(win_path);
+
+            let default_path = std::path::PathBuf::from(appdata)
+                .join("oauth-cli-kit")
+                .join("auth")
+                .join("oauth.json");
+            paths.push(default_path);
+        }
+    }
+
+    // 环境变量覆盖
+    if let Ok(custom_path) = std::env::var("OAUTH_CLI_KIT_TOKEN_PATH") {
+        paths.insert(0, std::path::PathBuf::from(custom_path));
+    }
+
+    paths
+}
+
 /// OAuth Provider 登录
 /// 通过打开终端运行 nanobot provider login 命令
 #[tauri::command]

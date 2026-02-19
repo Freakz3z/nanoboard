@@ -201,19 +201,22 @@ export function isOAuthProvider(providerId: string): boolean {
   return provider?.authType === "oauth";
 }
 
-// 检查 Provider 是否已配置
+// 检查 Provider 是否已配置（同步版本，用于快速UI检查）
+// 注意：对于 OAuth provider，此函数只检查配置对象是否存在
+// 真正的 token 状态需要通过 checkOAuthToken API 异步检查
 export function isProviderConfigured(
   config: { providers?: Record<string, { apiKey?: string; token?: string }> },
   providerId: string
 ): boolean {
   const providerConfig = config.providers?.[providerId];
-  if (!providerConfig) return false;
 
-  // OAuth provider 检查 token 字段
+  // OAuth provider: 只要有配置对象就认为"配置过"
+  // 真正的 token 状态由后端 check_oauth_token 命令检查
   if (isOAuthProvider(providerId)) {
-    return !!providerConfig.token && providerConfig.token.trim() !== "";
+    return !!providerConfig;
   }
 
-  // 普通 provider 检查 apiKey 字段
+  // 普通 provider: 检查 apiKey 字段
+  if (!providerConfig) return false;
   return !!providerConfig.apiKey && providerConfig.apiKey.trim() !== "";
 }

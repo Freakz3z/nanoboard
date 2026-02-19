@@ -1,37 +1,35 @@
-// nanobot 的默认配置
+// nanobot 的默认初始配置（完整模板）
 export const DEFAULT_CONFIG = {
-  providers: {},
   agents: {
     defaults: {
+      workspace: "~/.nanobot/workspace",
       model: "anthropic/claude-opus-4-5",
-      max_tokens: 8192,
-      max_tool_iterations: 20,
+      maxTokens: 8192,
       temperature: 0.7,
-      workspace: "~/.nanobot/workspace"
+      maxToolIterations: 20,
+      memoryWindow: 50
     }
   },
   channels: {
-    terminal: {
-      enabled: true
+    whatsapp: {
+      enabled: false,
+      bridgeUrl: "ws://localhost:3001",
+      bridgeToken: "",
+      allowFrom: []
     },
-    // Telegram 配置
     telegram: {
       enabled: false,
       token: "",
-      allowFrom: []
+      allowFrom: [],
+      proxy: null
     },
-    // Discord 配置
     discord: {
       enabled: false,
       token: "",
-      allowFrom: []
+      allowFrom: [],
+      gatewayUrl: "wss://gateway.discord.gg/?v=10&encoding=json",
+      intents: 37377
     },
-    // WhatsApp 配置
-    whatsapp: {
-      enabled: false,
-      allowFrom: []
-    },
-    // 飞书 (Feishu) 配置
     feishu: {
       enabled: false,
       appId: "",
@@ -40,28 +38,38 @@ export const DEFAULT_CONFIG = {
       verificationToken: "",
       allowFrom: []
     },
-    // 钉钉 (DingTalk) 配置
+    mochat: {
+      enabled: false,
+      baseUrl: "https://mochat.io",
+      socketUrl: "",
+      socketPath: "/socket.io",
+      socketDisableMsgpack: false,
+      socketReconnectDelayMs: 1000,
+      socketMaxReconnectDelayMs: 10000,
+      socketConnectTimeoutMs: 10000,
+      refreshIntervalMs: 30000,
+      watchTimeoutMs: 25000,
+      watchLimit: 100,
+      retryDelayMs: 500,
+      maxRetryAttempts: 0,
+      clawToken: "",
+      agentUserId: "",
+      sessions: [],
+      panels: [],
+      allowFrom: [],
+      mention: {
+        requireInGroups: false
+      },
+      groups: {},
+      replyDelayMode: "non-mention",
+      replyDelayMs: 120000
+    },
     dingtalk: {
       enabled: false,
       clientId: "",
       clientSecret: "",
       allowFrom: []
     },
-    // Slack 配置
-    slack: {
-      enabled: false,
-      botToken: "",
-      appToken: "",
-      groupPolicy: "mention"
-    },
-    // QQ 配置
-    qq: {
-      enabled: false,
-      appId: "",
-      secret: "",
-      allowFrom: []
-    },
-    // Email 配置
     email: {
       enabled: false,
       consentGranted: false,
@@ -69,15 +77,142 @@ export const DEFAULT_CONFIG = {
       imapPort: 993,
       imapUsername: "",
       imapPassword: "",
+      imapMailbox: "INBOX",
+      imapUseSsl: true,
       smtpHost: "",
       smtpPort: 587,
       smtpUsername: "",
       smtpPassword: "",
+      smtpUseTls: true,
+      smtpUseSsl: false,
       fromAddress: "",
+      autoReplyEnabled: true,
+      pollIntervalSeconds: 30,
+      markSeen: true,
+      maxBodyChars: 12000,
+      subjectPrefix: "Re: ",
+      allowFrom: []
+    },
+    slack: {
+      enabled: false,
+      mode: "socket",
+      webhookPath: "/slack/events",
+      botToken: "",
+      appToken: "",
+      userTokenReadOnly: true,
+      replyInThread: true,
+      reactEmoji: "eyes",
+      groupPolicy: "mention",
+      groupAllowFrom: [],
+      dm: {
+        enabled: true,
+        policy: "open",
+        allowFrom: []
+      }
+    },
+    qq: {
+      enabled: false,
+      appId: "",
+      secret: "",
       allowFrom: []
     }
   },
+  providers: {
+    custom: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    anthropic: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    openai: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    openrouter: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    deepseek: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    groq: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    zhipu: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    dashscope: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    vllm: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    gemini: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    moonshot: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    minimax: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    aihubmix: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    siliconflow: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    openaiCodex: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
+    githubCopilot: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    }
+  },
+  gateway: {
+    host: "0.0.0.0",
+    port: 18790
+  },
   tools: {
+    web: {
+      search: {
+        apiKey: "",
+        maxResults: 5
+      }
+    },
+    exec: {
+      timeout: 60
+    },
     restrictToWorkspace: false,
     mcpServers: {}
   }

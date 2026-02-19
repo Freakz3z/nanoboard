@@ -2,9 +2,9 @@
  * Provider 编辑模态框组件
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Trash2, LogIn, ExternalLink } from "lucide-react";
+import { Trash2, LogIn, ExternalLink, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import {
   Bot,
   Brain,
@@ -35,6 +35,12 @@ const ProviderIcon = ({ name, className }: { name: string; className?: string })
   const IconComponent = icons[name] || Bot;
   return <IconComponent className={className} />;
 };
+
+interface OAuthTokenStatus {
+  has_token: boolean;
+  is_expired?: boolean;
+  message: string;
+}
 
 interface ProviderEditModalProps {
   isOpen: boolean;
@@ -68,10 +74,37 @@ export default function ProviderEditModal({
   const { t } = useTranslation();
   const { showToast } = useToast();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [oauthTokenStatus, setOauthTokenStatus] = useState<OAuthTokenStatus | null>(null);
+  const [isCheckingToken, setIsCheckingToken] = useState(false);
 
   // 检查是否为 OAuth Provider
   const isOAuth = providerInfo?.authType === "oauth";
-  const hasToken = !!(config.providers?.[providerId]?.token);
+
+  // 当模态框打开且是OAuth provider时，检查token状态
+  useEffect(() => {
+    if (isOpen && isOAuth && providerInfo?.loginCommand) {
+      checkOAuthTokenStatus();
+    }
+  }, [isOpen, isOAuth, providerInfo?.loginCommand]);
+
+  // 检查OAuth token状态
+  const checkOAuthTokenStatus = async () => {
+    if (!providerInfo?.loginCommand) return;
+
+    setIsCheckingToken(true);
+    try {
+      const result = await processApi.checkOAuthToken(providerInfo.loginCommand);
+      setOauthTokenStatus(result);
+    } catch (error) {
+      console.error("检查OAuth token失败:", error);
+      setOauthTokenStatus({
+        has_token: false,
+        message: "检查token状态失败",
+      });
+    } finally {
+      setIsCheckingToken(false);
+    }
+  };
 
   // 处理 OAuth 登录
   const handleOAuthLogin = async () => {
@@ -93,6 +126,52 @@ export default function ProviderEditModal({
   };
 
   if (!isOpen || !providerInfo) return null;
+
+  // 渲染OAuth token状态
+  const renderOAuthStatus = () => {
+    if (isCheckingToken) {
+      return (
+        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-dark-text-muted">
+          <RefreshCw className="w-4 h-4 animate-spin" />
+          <span>{t("config.checkingToken")}</span>
+        </div>
+      );
+    }
+
+    if (!oauthTokenStatus) {
+      return (
+        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-dark-text-muted">
+          <AlertCircle className="w-4 h-4" />
+          <span>{t("config.tokenStatusUnknown")}</span>
+        </div>
+      );
+    }
+
+    if (oauthTokenStatus.has_token && !oauthTokenStatus.is_expired) {
+      return (
+        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+          <CheckCircle className="w-4 h-4" />
+          <span>{t("config.oauthLoggedIn")}</span>
+        </div>
+      );
+    }
+
+    if (oauthTokenStatus.has_token && oauthTokenStatus.is_expired) {
+      return (
+        <div className="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
+          <AlertCircle className="w-4 h-4" />
+          <span>{t("config.tokenExpired")}</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-dark-text-muted">
+        <AlertCircle className="w-4 h-4" />
+        <span>{t("config.notLoggedIn")}</span>
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -158,28 +237,37 @@ export default function ProviderEditModal({
                     <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
                       {t("config.oauthLoginDesc")}
                     </p>
-                    <button
-                      onClick={handleOAuthLogin}
-                      disabled={isLoggingIn}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-medium"
-                    >
-                      {isLoggingIn ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          {t("config.loggingIn")}
-                        </>
-                      ) : (
-                        <>
-                          <LogIn className="w-4 h-4" />
-                          {t("config.login")}
-                        </>
-                      )}
-                    </button>
-                    {hasToken && (
-                      <p className="mt-3 text-sm text-green-600 dark:text-green-400">
-                        {t("config.oauthLoggedIn")}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleOAuthLogin}
+                        disabled={isLoggingIn}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-medium"
+                      >
+                        {isLoggingIn ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            {t("config.loggingIn")}
+                          </>
+                        ) : (
+                          <>
+                            <LogIn className="w-4 h-4" />
+                            {t("config.login")}
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={checkOAuthTokenStatus}
+                        disabled={isCheckingToken}
+                        className="flex items-center gap-2 px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-gray-700 dark:text-gray-200 rounded-lg transition-colors text-sm"
+                        title={t("config.refreshTokenStatus")}
+                      >
+                        <RefreshCw className={`w-4 h-4 ${isCheckingToken ? "animate-spin" : ""}`} />
+                      </button>
+                    </div>
+                    {/* Token状态显示 */}
+                    <div className="mt-4 pt-3 border-t border-blue-200 dark:border-blue-500/30">
+                      {renderOAuthStatus()}
+                    </div>
                   </div>
                   {providerInfo.apiUrl && (
                     <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-dark-text-muted">
@@ -290,6 +378,19 @@ export default function ProviderEditModal({
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted"
                 />
                 <p className="text-xs text-gray-500 dark:text-dark-text-muted mt-1">{t("config.workspaceDesc")}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
+                  {t("config.memoryWindow")}
+                </label>
+                <input
+                  type="number"
+                  value={providerAgentConfig.memory_window ?? 50}
+                  onChange={(e) => onUpdateProviderAgentConfig(providerId, "memory_window", parseInt(e.target.value))}
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary"
+                />
+                <p className="text-xs text-gray-500 dark:text-dark-text-muted mt-1">{t("config.memoryWindowDesc")}</p>
               </div>
 
               <div>

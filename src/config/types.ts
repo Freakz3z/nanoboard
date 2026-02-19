@@ -17,14 +17,16 @@ export interface ProviderAgentConfig {
   model?: string;
   max_tokens?: number;
   max_tool_iterations?: number;
+  memory_window?: number;
   temperature?: number;
   workspace?: string;
 }
 
 export interface AgentDefaults {
   model?: string;
-  max_tokens?: number;
-  max_tool_iterations?: number;
+  maxTokens?: number;
+  maxToolIterations?: number;
+  memoryWindow?: number;
   temperature?: number;
   workspace?: string;
 }
@@ -73,6 +75,19 @@ export interface Config {
   tools?: {
     restrictToWorkspace?: boolean;
     mcpServers?: Record<string, McpServer>;
+    exec?: {
+      timeout?: number;
+    };
+    web?: {
+      search?: {
+        apiKey?: string;
+        maxResults?: number;
+      };
+    };
+  };
+  gateway?: {
+    host?: string;
+    port?: number;
   };
 }
 
