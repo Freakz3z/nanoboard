@@ -611,7 +611,9 @@
     "dashscope": "DashScope",
     "moonshot": "Moonshot",
     "zhipu": "Zhipu",
-    "vllm": "vLLM"
+    "vllm": "vLLM",
+    "siliconflow": "SiliconFlow",
+    "github": "GitHub Copilot"
   },
   "mcp": {
     "title": "MCP 服务器",

@@ -149,6 +149,31 @@ export const AVAILABLE_PROVIDERS: ProviderInfo[] = [
     defaultModel: "",
     models: [],
   },
+  {
+    id: "siliconflow",
+    nameKey: "providers.siliconflow",
+    icon: "Cpu",
+    colorClass: "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400",
+    apiBase: "https://api.siliconflow.cn/v1",
+    apiUrl: "https://cloud.siliconflow.cn",
+    defaultModel: "Qwen/Qwen2.5-72B-Instruct",
+    models: [
+      "Qwen/Qwen2.5-72B-Instruct",
+      "Qwen/Qwen2.5-32B-Instruct",
+      "deepseek-ai/DeepSeek-V3",
+      "deepseek-ai/DeepSeek-R1",
+    ],
+  },
+  {
+    id: "github",
+    nameKey: "providers.github",
+    icon: "Network",
+    colorClass: "bg-slate-50 dark:bg-slate-900/30 text-slate-600 dark:text-slate-400",
+    apiBase: "https://api.githubcopilot.com",
+    apiUrl: "https://github.com/features/copilot",
+    defaultModel: "gpt-4o",
+    models: ["gpt-4o", "gpt-4-turbo", "claude-3.5-sonnet"],
+  },
 ];
 
 // 根据 ID 获取 Provider 信息

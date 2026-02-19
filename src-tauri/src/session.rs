@@ -959,10 +959,25 @@ pub async fn delete_file(relative_path: String) -> Result<serde_json::Value, Str
 }
 
 /// 获取 chat sessions 路径
+/// 动态搜索 sessions 文件夹，优先使用 workspace/sessions，其次使用 .nanobot/sessions
 fn get_chat_sessions_path() -> Result<PathBuf> {
     let home = home_dir().context("无法找到用户主目录")?;
-    let sessions_path = home.join(".nanobot").join("sessions");
-    Ok(sessions_path)
+    let nanobot_dir = home.join(".nanobot");
+
+    // v0.1.4+ 新位置：workspace/sessions
+    let workspace_sessions = nanobot_dir.join("workspace").join("sessions");
+    if workspace_sessions.exists() {
+        return Ok(workspace_sessions);
+    }
+
+    // 旧位置：.nanobot/sessions
+    let legacy_sessions = nanobot_dir.join("sessions");
+    if legacy_sessions.exists() {
+        return Ok(legacy_sessions);
+    }
+
+    // 如果都不存在，返回新位置（用于创建新会话）
+    Ok(workspace_sessions)
 }
 
 /// 列出所有聊天会话

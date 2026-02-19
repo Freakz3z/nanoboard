@@ -1,6 +1,6 @@
 [package]
 name = "nanoboard"
-version = "0.2.4"
+version = "0.2.5"
 description = "Nanoboard - Manage your AI assistant"
 authors = ["Freakz3z <3020517046@qq.com>"]
 edition = "2021"
