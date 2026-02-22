@@ -2,7 +2,7 @@
 
 <img src="public/assets/logo_nanoboard.png" alt="Nanoboard Logo">
 
-**An Ultra-lightweight nanobot Management Assistant**
+# Ultra-lightweight nanobot Management Assistant
 
 [![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/React-18%2B-blue.svg)](https://react.dev/)
@@ -14,9 +14,6 @@ English | **[简体中文](README.md)**
 
 </div>
 
----
-
-## Features
 
 - **Visualization** - Visualize everything about your nanobot! From config files to system resources, from session logs to skills and memory, nanoboard provides an intuitive interface to manage and monitor your nanobot.
 - **Convenience** - Say goodbye to complex command-line operations. With nanoboard's user-friendly interface, managing and monitoring your nanobot becomes simple and efficient, allowing you to focus on what matters most!

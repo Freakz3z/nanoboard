@@ -2,7 +2,7 @@
 
 <img src="public/assets/logo_nanoboard.png" alt="Nanoboard Logo">
 
-**一个极轻量化的 nanobot 管理助手**
+# 极轻量化的 nanobot 管理助手
 
 [![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/React-18%2B-blue.svg)](https://react.dev/)
@@ -13,10 +13,6 @@
 **[English](README_en.md)** | 简体中文
 
 </div>
-
----
-
-## 特性
 
 - **可视化** - 从配置文件到系统资源，从会话记录到技能记忆，可视化 nanobot 的一切！
 - **便利化** - 远离复杂的命令行操作，用直观的界面来管理和监控，让一切变得简单又高效！
