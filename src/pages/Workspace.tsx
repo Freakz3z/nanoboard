@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
-import { fsApi, sessionApi, skillApi } from "../lib/tauri";
+import remarkGfm from "remark-gfm";
+import { fsApi, sessionApi, skillApi, chatSessionApi } from "../lib/tauri";
 import { useToast } from "../contexts/ToastContext";
 import {
   FileText,
@@ -22,6 +23,10 @@ import {
   Edit3,
   Brain,
   FolderTree,
+  MessageSquare,
+  User,
+  Bot,
+  Settings,
 } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -29,7 +34,7 @@ import type { Skill, Memory as MemoryType } from "../types";
 
 // ============== 类型定义 ==============
 
-type TabType = "files" | "skills" | "memory";
+type TabType = "files" | "skills" | "memory" | "sessions";
 
 interface FsItem {
   name: string;
@@ -49,6 +54,19 @@ interface FrontmatterData {
   name?: string;
   description?: string;
   body: string;
+}
+
+interface ChatSession {
+  id: string;
+  name: string;
+  title: string;
+  modified: number;
+  size: number;
+}
+
+interface ChatMessage {
+  role: string;
+  content: string;
 }
 
 interface ConfirmDialogState {
@@ -151,6 +169,14 @@ export default function Workspace() {
   const [isMemoryEditing, setIsMemoryEditing] = useState(false);
   const [memorySearchQuery, setMemorySearchQuery] = useState("");
 
+  // ============== 会话管理状态 ==============
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [selectedChatSession, setSelectedChatSession] = useState<ChatSession | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isLoadingChatContent, setIsLoadingChatContent] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
+  const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
+
   // ============== 通用状态 ==============
   const [isLoading, setIsLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({
@@ -177,6 +203,9 @@ export default function Workspace() {
           break;
         case "memory":
           await loadMemories();
+          break;
+        case "sessions":
+          await loadChatSessions();
           break;
       }
     } finally {
@@ -541,6 +570,107 @@ export default function Workspace() {
     });
   }
 
+  // ============== 会话管理函数 ==============
+
+  async function loadChatSessions() {
+    try {
+      const result = await chatSessionApi.list();
+      if (result.sessions) {
+        setChatSessions(result.sessions);
+      }
+    } catch (error) {
+      toast.showError(t("workspace.chatSessionsLoadFailed"));
+    }
+  }
+
+  async function selectChatSessionAction(session: ChatSession) {
+    setSelectedChatSession(session);
+    setChatMessages([]);
+    setIsLoadingChatContent(true);
+
+    try {
+      const result = await chatSessionApi.getContent(session.id);
+      if (result.success) {
+        setChatMessages(result.messages || []);
+      } else {
+        toast.showError(result.message || t("workspace.chatSessionsLoadContentFailed"));
+      }
+    } catch (error) {
+      toast.showError(t("workspace.chatSessionsLoadContentFailed"));
+    } finally {
+      setIsLoadingChatContent(false);
+    }
+  }
+
+  function getChatMessageStyle(role: string) {
+    const bubbleStyle = "bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl text-gray-900 dark:text-gray-100 shadow-lg border border-gray-200/50 dark:border-gray-700/50";
+
+    switch (role) {
+      case "user":
+        return {
+          container: "justify-end",
+          bubble: bubbleStyle,
+          icon: User,
+          label: t("workspace.chatUser"),
+          labelClass: "text-gray-600 dark:text-gray-400",
+        };
+      case "assistant":
+        return {
+          container: "justify-start",
+          bubble: bubbleStyle,
+          icon: Bot,
+          label: t("workspace.chatAssistant"),
+          labelClass: "text-gray-600 dark:text-gray-400",
+        };
+      case "system":
+        return {
+          container: "justify-center",
+          bubble: bubbleStyle,
+          icon: Settings,
+          label: t("workspace.chatSystem"),
+          labelClass: "text-gray-600 dark:text-gray-400",
+        };
+      default:
+        return {
+          container: "justify-start",
+          bubble: bubbleStyle,
+          icon: MessageSquare,
+          label: role,
+          labelClass: "text-gray-600 dark:text-gray-400",
+        };
+    }
+  }
+
+  function renderChatMessage(message: ChatMessage, index: number) {
+    const style = getChatMessageStyle(message.role);
+    const Icon = style.icon;
+
+    return (
+      <div key={index} className={`flex ${style.container} mb-4 min-w-0`}>
+        <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${style.bubble} min-w-0 overflow-hidden`}>
+          <div className="flex items-center gap-2 mb-2">
+            <Icon className="w-4 h-4 flex-shrink-0" />
+            <span className={`text-sm font-medium ${style.labelClass}`}>
+              {style.label}
+            </span>
+          </div>
+          <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-0 prose-p:leading-relaxed prose-pre:my-2 prose-pre:bg-gray-800/50 dark:prose-pre:bg-gray-900/50 prose-pre:overflow-x-auto prose-code:text-inherit prose-table:text-sm prose-table:block prose-table:overflow-x-auto prose-th:bg-gray-100/50 dark:prose-th:bg-gray-700/50 prose-th:p-2 prose-td:p-2 prose-thead:border-b prose-tbody:border-collapse break-words">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 自动滚动到底部
+  useEffect(() => {
+    if (chatMessagesContainerRef.current) {
+      chatMessagesContainerRef.current.scrollTop = chatMessagesContainerRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
   // ============== 辅助函数 ==============
 
   function closeConfirmDialog() {
@@ -555,10 +685,6 @@ export default function Workspace() {
   // ============== 过滤数据 ==============
 
   const filteredItems = items.filter((item) => {
-    // 排除 sessions 文件夹（已有单独的"会话"界面）
-    if (item.name === "sessions" && item.type === "directory") {
-      return false;
-    }
     const query = fileSearchQuery.toLowerCase();
     return item.name.toLowerCase().includes(query);
   });
@@ -574,6 +700,14 @@ export default function Workspace() {
   const filteredMemories = memories.filter((memory) => {
     const query = memorySearchQuery.toLowerCase();
     return memory.name.toLowerCase().includes(query);
+  });
+
+  const filteredChatSessions = chatSessions.filter((session) => {
+    const query = chatSearchQuery.toLowerCase();
+    return (
+      session.name.toLowerCase().includes(query) ||
+      (session.title && session.title.toLowerCase().includes(query))
+    );
   });
 
   // ============== 渲染 ==============
@@ -627,6 +761,19 @@ export default function Workspace() {
               </div>
             )}
 
+            {activeTab === "sessions" && (
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-dark-text-muted" />
+                <input
+                  type="text"
+                  placeholder={t("workspace.searchSessions")}
+                  value={chatSearchQuery}
+                  onChange={(e) => setChatSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm bg-white dark:bg-dark-bg-sidebar text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted transition-colors duration-200"
+                />
+              </div>
+            )}
+
             {/* Tab 切换按钮 - 放在最右侧 */}
             <div className="flex items-center bg-gray-100 dark:bg-dark-bg-sidebar rounded-lg p-1">
               <button
@@ -661,6 +808,17 @@ export default function Workspace() {
               >
                 <Brain className="w-4 h-4" />
                 {t("workspace.memoryTab")}
+              </button>
+              <button
+                onClick={() => setActiveTab("sessions")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === "sessions"
+                    ? "bg-white dark:bg-dark-bg-card text-green-600 dark:text-green-400 shadow-sm"
+                    : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text-primary"
+                }`}
+              >
+                <MessageSquare className="w-4 h-4" />
+                {t("workspace.sessionsTab")}
               </button>
             </div>
           </div>
@@ -850,6 +1008,48 @@ export default function Workspace() {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
+                        </div>
+                      </div>
+                    ))
+                  )
+                )}
+
+                {/* 会话列表 */}
+                {activeTab === "sessions" && (
+                  filteredChatSessions.length === 0 ? (
+                    <EmptyState
+                      icon={chatSearchQuery ? Search : MessageSquare}
+                      title={chatSearchQuery ? t("workspace.noMatchingSessions") : t("workspace.noSessions")}
+                      description={chatSearchQuery ? t("workspace.tryOtherKeywords") : t("workspace.noSessionsDesc")}
+                    />
+                  ) : (
+                    filteredChatSessions.map((session) => (
+                      <div
+                        key={session.id}
+                        onClick={() => selectChatSessionAction(session)}
+                        className={`group flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                          selectedChatSession?.id === session.id
+                            ? "border-green-500 bg-green-50 dark:bg-green-900/20"
+                            : "border-gray-200 dark:border-dark-border-subtle hover:border-gray-300 dark:hover:border-dark-border-default hover:bg-gray-50 dark:hover:bg-dark-bg-hover"
+                        }`}
+                      >
+                        <div className="flex-shrink-0">
+                          <MessageSquare className="w-5 h-5 text-green-500 dark:text-green-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-900 dark:text-dark-text-primary truncate text-sm">
+                            {session.name}
+                          </h3>
+                          <p className="text-xs text-gray-500 dark:text-dark-text-muted truncate mt-0.5">
+                            {session.title}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-dark-text-muted mt-0.5">
+                            <span>{formatSize(session.size)}</span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {formatTimestamp(session.modified, t, i18n)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     ))
@@ -1072,6 +1272,65 @@ export default function Workspace() {
                   icon={Brain}
                   title={t("workspace.selectMemory")}
                   description={t("workspace.selectMemoryDesc")}
+                />
+              </div>
+            )
+          )}
+
+          {/* 会话详情 */}
+          {activeTab === "sessions" && (
+            selectedChatSession ? (
+              <>
+                <div className="bg-white dark:bg-dark-bg-card border-b border-gray-200 dark:border-dark-border-subtle px-6 py-4 flex-shrink-0 transition-colors duration-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="w-5 h-5 text-green-500 dark:text-green-400" />
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary truncate">
+                          {selectedChatSession.name}
+                        </h2>
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-dark-text-muted mt-1">
+                        {formatSize(selectedChatSession.size)} · {formatTimestamp(selectedChatSession.modified, t, i18n)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => { setSelectedChatSession(null); setChatMessages([]); }}
+                      className="p-2 text-gray-400 dark:text-dark-text-muted hover:text-gray-600 dark:hover:text-dark-text-primary hover:bg-gray-100 dark:hover:bg-dark-bg-hover rounded-lg transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden p-6">
+                  {isLoadingChatContent ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                    </div>
+                  ) : chatMessages.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <EmptyState
+                        icon={FileText}
+                        title={t("workspace.noMessages")}
+                        description={t("workspace.noMessagesDesc")}
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      ref={chatMessagesContainerRef}
+                      className="h-full overflow-y-auto overflow-x-hidden bg-white/40 dark:bg-dark-bg-card/40 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-dark-border-subtle/50 p-6 scrollbar-thin"
+                    >
+                      {chatMessages.map((msg, idx) => renderChatMessage(msg, idx))}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <EmptyState
+                  icon={MessageSquare}
+                  title={t("workspace.selectSession")}
+                  description={t("workspace.selectSessionDesc")}
                 />
               </div>
             )

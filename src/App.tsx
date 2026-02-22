@@ -10,7 +10,6 @@ import ConfigEditor from "./pages/ConfigEditor";
 import Logs from "./pages/Logs";
 import Workspace from "./pages/Workspace";
 import CronJobs from "./pages/CronJobs";
-import Sessions from "./pages/Sessions";
 import About from "./pages/About";
 import { ContextMenu } from "./components/ContextMenu";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -79,7 +78,6 @@ function AppContent() {
           <Route path="/config" element={<ConfigEditor />} />
           <Route path="/logs" element={<Logs />} />
           <Route path="/workspace" element={<Workspace />} />
-          <Route path="/sessions" element={<Sessions />} />
           <Route path="/cron" element={<CronJobs />} />
           <Route path="/about" element={<About />} />
           <Route path="*" element={<Navigate to="/" replace />} />

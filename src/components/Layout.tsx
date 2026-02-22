@@ -14,7 +14,6 @@ import {
   CalendarClock,
   ChevronLeft,
   ChevronRight,
-  MessageSquare,
   FolderTree,
   Info,
 } from "lucide-react";
@@ -51,7 +50,6 @@ export default function Layout({ children }: LayoutProps) {
 
   const navItems = [
     { path: "/", label: t("nav.dashboard"), icon: LayoutDashboard },
-    { path: "/sessions", label: t("nav.chatSessions"), icon: MessageSquare },
     { path: "/logs", label: t("nav.logs"), icon: ScrollText },
     { path: "/workspace", label: t("nav.workspace"), icon: FolderTree },
     { path: "/cron", label: t("nav.cron"), icon: CalendarClock },
