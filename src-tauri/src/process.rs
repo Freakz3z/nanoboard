@@ -2060,3 +2060,110 @@ async fn get_system_info_internal() -> Result<serde_json::Value, String> {
         }
     }))
 }
+
+// 全局自定义路径状态
+
+// 自定义路径存储（使用静态变量存储在内存中）
+static CUSTOM_PYTHON_PATH: std::sync::OnceLock<std::sync::Mutex<Option<String>>> = std::sync::OnceLock::new();
+static CUSTOM_NANOBOT_PATH: std::sync::OnceLock<std::sync::Mutex<Option<String>>> = std::sync::OnceLock::new();
+
+fn get_custom_python_path_internal() -> Option<String> {
+    CUSTOM_PYTHON_PATH
+        .get_or_init(|| std::sync::Mutex::new(None))
+        .lock()
+        .ok()
+        .and_then(|p| p.clone())
+}
+
+fn set_custom_python_path_internal(path: Option<String>) {
+    if let Ok(mut storage) = CUSTOM_PYTHON_PATH
+        .get_or_init(|| std::sync::Mutex::new(None))
+        .lock()
+    {
+        *storage = path;
+    }
+}
+
+fn get_custom_nanobot_path_internal() -> Option<String> {
+    CUSTOM_NANOBOT_PATH
+        .get_or_init(|| std::sync::Mutex::new(None))
+        .lock()
+        .ok()
+        .and_then(|p| p.clone())
+}
+
+fn set_custom_nanobot_path_internal(path: Option<String>) {
+    if let Ok(mut storage) = CUSTOM_NANOBOT_PATH
+        .get_or_init(|| std::sync::Mutex::new(None))
+        .lock()
+    {
+        *storage = path;
+    }
+}
+
+/// 设置自定义路径
+#[tauri::command]
+pub async fn set_custom_paths(
+    python_path: Option<String>,
+    nanobot_path: Option<String>,
+) -> Result<serde_json::Value, String> {
+    set_custom_python_path_internal(python_path.clone());
+    set_custom_nanobot_path_internal(nanobot_path.clone());
+
+    log::info!("自定义路径已更新: python={:?}, nanobot={:?}", python_path, nanobot_path);
+
+    Ok(json!({
+        "status": "success",
+        "message": "自定义路径已保存"
+    }))
+}
+
+/// 获取自定义路径
+#[tauri::command]
+pub async fn get_custom_paths() -> Result<serde_json::Value, String> {
+    let python_path = get_custom_python_path_internal();
+    let nanobot_path = get_custom_nanobot_path_internal();
+
+    Ok(json!({
+        "pythonPath": python_path,
+        "nanobotPath": nanobot_path
+    }))
+}
+
+/// 获取 Python 可执行文件路径
+#[tauri::command]
+pub async fn get_python_path() -> Result<serde_json::Value, String> {
+    // 优先使用自定义路径
+    if let Some(custom) = get_custom_python_path_internal() {
+        if !custom.is_empty() {
+            return Ok(json!({
+                "path": custom,
+                "found": true,
+                "source": "custom"
+            }));
+        }
+    }
+
+    // 自动检测
+    #[cfg(windows)]
+    let python_commands = &["python", "python3", "py"];
+    #[cfg(not(windows))]
+    let python_commands = &["python3", "python"];
+
+    for cmd in python_commands {
+        if let Some(path) = find_via_which(cmd) {
+            return Ok(json!({
+                "path": path,
+                "found": true,
+                "source": "auto"
+            }));
+        }
+    }
+
+    Ok(json!({
+        "path": null,
+        "found": false,
+        "source": "auto",
+        "message": "未找到 Python"
+    }))
+}

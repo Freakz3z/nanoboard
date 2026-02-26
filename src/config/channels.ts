@@ -13,6 +13,7 @@ export const CHANNELS_CONFIG: ChannelInfo[] = [
     colorClass: "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
     fields: [
       { name: "token", labelKey: "config.apiKey", type: "password", placeholderKey: "config.channels.telegram.tokenPlaceholder" },
+      { name: "proxy", labelKey: "config.channels.telegram.proxyLabel", type: "text", placeholderKey: "config.channels.telegram.proxyPlaceholder" },
       { name: "allowFrom", labelKey: "config.allowFrom", type: "text", placeholderKey: "config.channels.telegram.allowFromPlaceholder" },
       { name: "replyToMessage", labelKey: "config.channels.telegram.replyToMessageLabel", type: "select", options: ["true", "false"], default: "false" },
     ],
@@ -83,6 +84,20 @@ export const CHANNELS_CONFIG: ChannelInfo[] = [
       { name: "appId", labelKey: "config.appId", type: "text", placeholderKey: "config.channels.qq.appIdPlaceholder" },
       { name: "secret", labelKey: "config.channels.qq.secretLabel", type: "password", placeholderKey: "config.channels.qq.secretPlaceholder" },
       { name: "allowFrom", labelKey: "config.allowFrom", type: "text", placeholderKey: "config.channels.qq.allowFromPlaceholder" },
+    ],
+  },
+  {
+    key: "matrix",
+    nameKey: "channels.matrix",
+    colorClass: "bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400",
+    fields: [
+      { name: "homeserver", labelKey: "config.channels.matrix.homeserverLabel", type: "text", placeholderKey: "config.channels.matrix.homeserverPlaceholder", default: "https://matrix.org" },
+      { name: "accessToken", labelKey: "config.channels.matrix.accessTokenLabel", type: "password", placeholderKey: "config.channels.matrix.accessTokenPlaceholder" },
+      { name: "userId", labelKey: "config.channels.matrix.userIdLabel", type: "text", placeholderKey: "config.channels.matrix.userIdPlaceholder" },
+      { name: "deviceId", labelKey: "config.channels.matrix.deviceIdLabel", type: "text", placeholderKey: "config.channels.matrix.deviceIdPlaceholder" },
+      { name: "e2eeEnabled", labelKey: "config.channels.matrix.e2eeEnabledLabel", type: "select", options: ["true", "false"], default: "true" },
+      { name: "groupPolicy", labelKey: "config.channels.matrix.groupPolicyLabel", type: "select", options: ["open", "mention", "allowlist"], default: "open" },
+      { name: "allowFrom", labelKey: "config.allowFrom", type: "text", placeholderKey: "config.channels.matrix.allowFromPlaceholder" },
     ],
   },
   {

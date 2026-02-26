@@ -257,6 +257,8 @@
         "difficulty": "简单",
         "description": "推荐，只需要 bot token",
         "tokenPlaceholder": "从 @BotFather 获取",
+        "proxyLabel": "代理服务器",
+        "proxyPlaceholder": "http://127.0.0.1:7890 或 socks5://127.0.0.1:1080",
         "allowFromPlaceholder": "留空允许所有人，或输入用户ID，用逗号分隔",
         "replyToMessageLabel": "回复原消息"
       },
@@ -338,6 +340,21 @@
         "allowFromPlaceholder": "留空允许所有人，或输入邮箱，用逗号分隔",
         "allowFromLabel": "允许的发件人"
       },
+      "matrix": {
+        "difficulty": "中等",
+        "description": "Matrix (Element) 去中心化通讯",
+        "homeserverLabel": "Home Server",
+        "homeserverPlaceholder": "https://matrix.org",
+        "accessTokenLabel": "Access Token",
+        "accessTokenPlaceholder": "从 Matrix 客户端获取",
+        "userIdLabel": "用户 ID",
+        "userIdPlaceholder": "@bot:matrix.org",
+        "deviceIdLabel": "设备 ID",
+        "deviceIdPlaceholder": "设备标识符",
+        "e2eeEnabledLabel": "端到端加密 (E2EE)",
+        "groupPolicyLabel": "群组策略",
+        "allowFromPlaceholder": "留空允许所有人，或输入用户 ID，用逗号分隔"
+      },
       "terminal": {
         "difficulty": "无需配置",
         "description": "本地终端交互，建议保持开启"
@@ -379,12 +396,22 @@
     "forExample": "例如: ",
     "agentDefaults": "Agent 默认配置",
     "agentDefaultsDesc": "配置 Agent 的默认参数，包括模型、Token 限制、温度等。",
+    "providerLabel": "Provider",
+    "providerAuto": "自动检测",
+    "providerDesc": "显式指定 LLM Provider，或选择「自动检测」根据模型名称自动匹配",
+    "autoConfigParamsTitle": "自动配置 Agent 参数",
+    "autoConfigParamsDesc": "将此 Provider 设置为默认，并应用推荐的 Agent 参数",
+    "autoConfigParamsBtn": "应用配置",
+    "providerAutoConfigSuccess": "已将 {{name}} 设置为默认 Provider",
     "memoryWindow": "记忆窗口",
     "memoryWindowDesc": "Agent 记忆窗口大小，控制保留的历史消息数量",
     "toolsConfig": "工具配置",
     "execConfig": "命令执行配置",
     "execTimeout": "执行超时时间",
     "execTimeoutDesc": "Shell 命令执行的最大等待时间（秒）",
+    "pathAppendLabel": "扩展 PATH",
+    "pathAppendPlaceholder": "/usr/local/bin:/custom/path",
+    "pathAppendDesc": "扩展子进程的 PATH 环境变量，多个路径用冒号分隔",
     "seconds": "秒",
     "webSearchConfig": "网络搜索配置",
     "webSearchApiKey": "搜索 API Key",
@@ -690,6 +717,7 @@
     "dingtalk": "钉钉",
     "slack": "Slack",
     "qq": "QQ",
+    "matrix": "Matrix",
     "email": "邮件",
     "terminal": "终端"
   },
@@ -1031,6 +1059,16 @@
     "newVersionAvailable": "有新版本",
     "checkingUpdate": "检查更新中...",
     "updateCheckFailed": "检查更新失败",
-    "latestVersion": "已是最新版本"
+    "latestVersion": "已是最新版本",
+    "customPaths": "自定义路径",
+    "customPathsDesc": "设置自定义的 Python 和 Nanobot 路径。留空则自动检测系统路径。",
+    "pythonPath": "Python 路径",
+    "pythonPathPlaceholder": "自动检测 Python 可执行文件路径",
+    "nanobotPath": "Nanobot 路径",
+    "nanobotPathPlaceholder": "自动检测 Nanobot 可执行文件路径",
+    "savePaths": "保存路径",
+    "saved": "已保存",
+    "autoDetect": "自动检测",
+    "detected": "检测到"
   }
 }

@@ -24,6 +24,7 @@ export interface ProviderAgentConfig {
 
 export interface AgentDefaults {
   model?: string;
+  provider?: string;  // 显式指定 provider，"auto" 为自动检测
   maxTokens?: number;
   maxToolIterations?: number;
   memoryWindow?: number;
@@ -37,6 +38,7 @@ export interface Channel {
   // Telegram & Discord
   token?: string;
   allowFrom?: string[];
+  proxy?: string;  // Telegram proxy
   // Feishu
   appId?: string;
   appSecret?: string;
@@ -64,6 +66,16 @@ export interface Channel {
   smtpPassword?: string;
   fromAddress?: string;
   autoReplyEnabled?: boolean;
+  // Matrix
+  homeserver?: string;
+  accessToken?: string;
+  userId?: string;
+  deviceId?: string;
+  e2eeEnabled?: boolean;
+  syncStopGraceSeconds?: number;
+  maxMediaBytes?: number;
+  groupAllowFrom?: string[];
+  allowRoomMentions?: boolean;
 }
 
 export interface Config {
@@ -77,6 +89,7 @@ export interface Config {
     mcpServers?: Record<string, McpServer>;
     exec?: {
       timeout?: number;
+      pathAppend?: string;  // 扩展 PATH 环境变量
     };
     web?: {
       search?: {

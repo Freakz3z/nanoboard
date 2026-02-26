@@ -85,6 +85,9 @@ async fn main() {
             process::check_oauth_token,
             process::check_nanobot_config,
             process::diagnose_nanobot,
+            process::set_custom_paths,
+            process::get_custom_paths,
+            process::get_python_path,
             // Logger commands
             logger::get_logs,
             logger::get_log_statistics,

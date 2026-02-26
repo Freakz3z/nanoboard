@@ -249,6 +249,8 @@
         "difficulty": "Simple",
         "description": "Recommended, only needs bot token",
         "tokenPlaceholder": "Get from @BotFather",
+        "proxyLabel": "Proxy Server",
+        "proxyPlaceholder": "http://127.0.0.1:7890 or socks5://127.0.0.1:1080",
         "allowFromPlaceholder": "Leave empty to allow everyone, or enter user IDs separated by commas",
         "replyToMessageLabel": "Reply to Original Message"
       },
@@ -330,6 +332,21 @@
         "allowFromPlaceholder": "Leave empty to allow everyone, or enter emails separated by commas",
         "allowFromLabel": "Allowed Senders"
       },
+      "matrix": {
+        "difficulty": "Medium",
+        "description": "Matrix (Element) decentralized communication",
+        "homeserverLabel": "Home Server",
+        "homeserverPlaceholder": "https://matrix.org",
+        "accessTokenLabel": "Access Token",
+        "accessTokenPlaceholder": "Get from Matrix client",
+        "userIdLabel": "User ID",
+        "userIdPlaceholder": "@bot:matrix.org",
+        "deviceIdLabel": "Device ID",
+        "deviceIdPlaceholder": "Device identifier",
+        "e2eeEnabledLabel": "End-to-End Encryption (E2EE)",
+        "groupPolicyLabel": "Group Policy",
+        "allowFromPlaceholder": "Leave empty to allow everyone, or enter user IDs separated by commas"
+      },
       "terminal": {
         "difficulty": "No config needed",
         "description": "Local terminal interaction, recommended to keep enabled"
@@ -370,12 +387,22 @@
     "forExample": "e.g., ",
     "agentDefaults": "Agent Defaults",
     "agentDefaultsDesc": "Configure default parameters for agents, including model, token limits, temperature, etc.",
+    "providerLabel": "Provider",
+    "providerAuto": "Auto Detect",
+    "providerDesc": "Explicitly specify LLM Provider, or select 'Auto Detect' to match based on model name",
+    "autoConfigParamsTitle": "Auto Configure Agent Parameters",
+    "autoConfigParamsDesc": "Set this provider as default and apply recommended agent parameters",
+    "autoConfigParamsBtn": "Apply Configuration",
+    "providerAutoConfigSuccess": "{{name}} has been set as the default provider",
     "memoryWindow": "Memory Window",
     "memoryWindowDesc": "Agent memory window size, controls the number of historical messages retained",
     "toolsConfig": "Tools Configuration",
     "execConfig": "Command Execution",
     "execTimeout": "Execution Timeout",
     "execTimeoutDesc": "Maximum wait time for shell command execution (seconds)",
+    "pathAppendLabel": "Extend PATH",
+    "pathAppendPlaceholder": "/usr/local/bin:/custom/path",
+    "pathAppendDesc": "Extend PATH environment variable for subprocesses, separate multiple paths with colon",
     "seconds": "seconds",
     "webSearchConfig": "Web Search",
     "webSearchApiKey": "Search API Key",
@@ -683,6 +710,7 @@
     "dingtalk": "DingTalk",
     "slack": "Slack",
     "qq": "QQ",
+    "matrix": "Matrix",
     "email": "Email",
     "terminal": "Terminal"
   },
@@ -1032,6 +1060,16 @@
     "newVersionAvailable": "New version available",
     "checkingUpdate": "Checking for updates...",
     "updateCheckFailed": "Failed to check for updates",
-    "latestVersion": "Up to date"
+    "latestVersion": "Up to date",
+    "customPaths": "Custom Paths",
+    "customPathsDesc": "Set custom Python and Nanobot paths. Leave empty to auto-detect from system.",
+    "pythonPath": "Python Path",
+    "pythonPathPlaceholder": "Auto-detect Python executable path",
+    "nanobotPath": "Nanobot Path",
+    "nanobotPathPlaceholder": "Auto-detect Nanobot executable path",
+    "savePaths": "Save Paths",
+    "saved": "Saved",
+    "autoDetect": "Auto Detect",
+    "detected": "Detected"
   }
 }

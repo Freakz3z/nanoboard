@@ -4,6 +4,7 @@ export const DEFAULT_CONFIG = {
     defaults: {
       workspace: "~/.nanobot/workspace",
       model: "anthropic/claude-opus-4-5",
+      provider: "auto",
       maxTokens: 8192,
       temperature: 0.7,
       maxToolIterations: 20,
@@ -21,7 +22,8 @@ export const DEFAULT_CONFIG = {
       enabled: false,
       token: "",
       allowFrom: [],
-      proxy: null
+      proxy: null,
+      replyToMessage: false
     },
     discord: {
       enabled: false,
@@ -115,6 +117,20 @@ export const DEFAULT_CONFIG = {
       appId: "",
       secret: "",
       allowFrom: []
+    },
+    matrix: {
+      enabled: false,
+      homeserver: "https://matrix.org",
+      accessToken: "",
+      userId: "",
+      deviceId: "",
+      e2eeEnabled: true,
+      syncStopGraceSeconds: 2,
+      maxMediaBytes: 20971520,
+      allowFrom: [],
+      groupPolicy: "open",
+      groupAllowFrom: [],
+      allowRoomMentions: false
     }
   },
   providers: {
@@ -188,6 +204,11 @@ export const DEFAULT_CONFIG = {
       apiBase: null,
       extraHeaders: null
     },
+    volcengine: {
+      apiKey: "",
+      apiBase: null,
+      extraHeaders: null
+    },
     openaiCodex: {
       apiKey: "",
       apiBase: null,
@@ -211,7 +232,8 @@ export const DEFAULT_CONFIG = {
       }
     },
     exec: {
-      timeout: 60
+      timeout: 60,
+      pathAppend: ""
     },
     restrictToWorkspace: false,
     mcpServers: {}

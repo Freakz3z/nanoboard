@@ -14,8 +14,14 @@ import {
   AlertCircle,
   XCircle,
   Sparkles,
+  Settings,
+  Save,
+  RefreshCw,
 } from "lucide-react";
 import type { DiagnosticResult } from "@/types";
+
+// 自定义路径存储 key
+const CUSTOM_PATHS_KEY = "nanoboard_custom_paths";
 
 // 应用信息
 const APP_INFO = {
@@ -34,9 +40,38 @@ interface SystemInfoData {
   pythonVersion: string | null;
   nanobotVersion: string | null;
   nanobotPath: string | null;
+  pythonPath: string | null;
 }
 
 type UpdateStatus = "checking" | "latest" | "available" | "error";
+
+// 自定义路径配置
+interface CustomPaths {
+  pythonPath: string;
+  nanobotPath: string;
+}
+
+// 加载自定义路径配置
+function loadCustomPaths(): CustomPaths {
+  try {
+    const stored = localStorage.getItem(CUSTOM_PATHS_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error("Failed to load custom paths:", error);
+  }
+  return { pythonPath: "", nanobotPath: "" };
+}
+
+// 保存自定义路径配置
+function saveCustomPaths(paths: CustomPaths) {
+  try {
+    localStorage.setItem(CUSTOM_PATHS_KEY, JSON.stringify(paths));
+  } catch (error) {
+    console.error("Failed to save custom paths:", error);
+  }
+}
 
 export default function About() {
   const { t } = useTranslation();
@@ -46,11 +81,44 @@ export default function About() {
   const [showDiagnosis, setShowDiagnosis] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("checking");
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [customPaths, setCustomPaths] = useState<CustomPaths>(loadCustomPaths);
+  const [pathsSaved, setPathsSaved] = useState(false);
 
   useEffect(() => {
     loadSystemInfo();
     checkForUpdates();
   }, []);
+
+  // 保存自定义路径
+  async function handleSavePaths() {
+    try {
+      // 保存到后端
+      await processApi.setCustomPaths(
+        customPaths.pythonPath || undefined,
+        customPaths.nanobotPath || undefined
+      );
+      // 同时保存到 localStorage 作为备份
+      saveCustomPaths(customPaths);
+      setPathsSaved(true);
+      setTimeout(() => setPathsSaved(false), 2000);
+      // 重新加载系统信息以应用新路径
+      loadSystemInfo();
+    } catch (error) {
+      console.error("Failed to save custom paths:", error);
+    }
+  }
+
+  // 重置为自动检测
+  async function handleResetPaths() {
+    try {
+      await processApi.setCustomPaths(undefined, undefined);
+      setCustomPaths({ pythonPath: "", nanobotPath: "" });
+      saveCustomPaths({ pythonPath: "", nanobotPath: "" });
+      loadSystemInfo();
+    } catch (error) {
+      console.error("Failed to reset custom paths:", error);
+    }
+  }
 
   async function checkForUpdates() {
     try {
@@ -82,10 +150,12 @@ export default function About() {
 
   async function loadSystemInfo() {
     try {
-      const [sysInfo, versionInfo, pathInfo] = await Promise.all([
+      const [sysInfo, versionInfo, pathInfo, pythonPathInfo, customPathsInfo] = await Promise.all([
         processApi.getSystemInfo(),
         processApi.getVersion().catch(() => null),
         processApi.getNanobotPath().catch(() => null),
+        processApi.getPythonPath().catch(() => null),
+        processApi.getCustomPaths().catch(() => null),
       ]);
 
       setSystemInfo({
@@ -95,7 +165,16 @@ export default function About() {
         pythonVersion: sysInfo?.python_version || null,
         nanobotVersion: versionInfo?.version || null,
         nanobotPath: pathInfo?.path || null,
+        pythonPath: pythonPathInfo?.path || null,
       });
+
+      // 如果后端有保存的自定义路径，更新本地状态
+      if (customPathsInfo) {
+        setCustomPaths({
+          pythonPath: customPathsInfo.pythonPath || "",
+          nanobotPath: customPathsInfo.nanobotPath || "",
+        });
+      }
     } catch (error) {
       console.error("Failed to load system info:", error);
     }
@@ -284,6 +363,81 @@ export default function About() {
                   <code className="text-xs font-mono text-gray-500 dark:text-dark-text-muted">{item.value}</code>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* 自定义路径配置 */}
+          <div className="mt-6 pt-6 border-t border-gray-100 dark:border-dark-border-subtle">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-gray-500 dark:text-dark-text-muted flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                {t("about.customPaths")}
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleResetPaths}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text-primary hover:bg-gray-100 dark:hover:bg-dark-bg-hover rounded-lg transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  {t("about.autoDetect")}
+                </button>
+                <button
+                  onClick={handleSavePaths}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                    pathsSaved
+                      ? "bg-green-600 text-white"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
+                >
+                  <Save className="w-4 h-4" />
+                  {pathsSaved ? t("about.saved") : t("about.savePaths")}
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-dark-text-muted mb-4">
+              {t("about.customPathsDesc")}
+            </p>
+            <div className="space-y-4">
+              {/* Python 路径 */}
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1.5">
+                  {t("about.pythonPath")}
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={customPaths.pythonPath}
+                    onChange={(e) => setCustomPaths({ ...customPaths, pythonPath: e.target.value })}
+                    placeholder={systemInfo?.pythonPath || t("about.pythonPathPlaceholder")}
+                    className="flex-1 px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted font-mono"
+                  />
+                  {systemInfo?.pythonPath && !customPaths.pythonPath && (
+                    <span className="text-xs text-gray-400 dark:text-dark-text-muted whitespace-nowrap">
+                      {t("about.detected")}: {systemInfo.pythonPath}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {/* Nanobot 路径 */}
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1.5">
+                  {t("about.nanobotPath")}
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={customPaths.nanobotPath}
+                    onChange={(e) => setCustomPaths({ ...customPaths, nanobotPath: e.target.value })}
+                    placeholder={systemInfo?.nanobotPath || t("about.nanobotPathPlaceholder")}
+                    className="flex-1 px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted font-mono"
+                  />
+                  {systemInfo?.nanobotPath && !customPaths.nanobotPath && (
+                    <span className="text-xs text-gray-400 dark:text-dark-text-muted whitespace-nowrap">
+                      {t("about.detected")}: {systemInfo.nanobotPath}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

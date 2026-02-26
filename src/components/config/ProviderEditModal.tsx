@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Trash2, LogIn, LogOut, ExternalLink, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { Trash2, LogIn, LogOut, ExternalLink, CheckCircle, AlertCircle, RefreshCw, Sparkles, Settings2 } from "lucide-react";
 import {
   Bot,
   Brain,
@@ -56,6 +56,7 @@ interface ProviderEditModalProps {
   onRemoveProvider: (name: string) => void;
   onUpdateProviderAgentConfig: (providerId: string, field: keyof ProviderAgentConfig, value: unknown) => void;
   onOAuthStatusChange?: (providerId: string, hasToken: boolean, isExpired: boolean) => void;
+  onAutoConfig?: (providerId: string) => void;
 }
 
 export default function ProviderEditModal({
@@ -72,6 +73,7 @@ export default function ProviderEditModal({
   onRemoveProvider,
   onUpdateProviderAgentConfig,
   onOAuthStatusChange,
+  onAutoConfig,
 }: ProviderEditModalProps) {
   const { t } = useTranslation();
   const { showToast } = useToast();
@@ -381,6 +383,34 @@ export default function ProviderEditModal({
             </div>
           ) : (
             <div className="space-y-4">
+              {/* 自动配置参数按钮 */}
+              <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border border-purple-200 dark:border-purple-500/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/50 dark:bg-white/10 rounded-lg">
+                      <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-purple-900 dark:text-purple-100 text-sm">
+                        {t("config.autoConfigParamsTitle")}
+                      </h4>
+                      <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5">
+                        {t("config.autoConfigParamsDesc")}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      onAutoConfig?.(providerId);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium shadow-sm"
+                  >
+                    <Settings2 className="w-4 h-4" />
+                    {t("config.autoConfigParamsBtn")}
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
                   {t("config.model")}

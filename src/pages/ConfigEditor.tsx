@@ -356,7 +356,7 @@ export default function ConfigEditor() {
     saveProviderAgentConfigs(updatedConfig);
   }
 
-  async function applyProviderAgentConfig(providerId: string) {
+  async function applyProviderAgentConfig(providerId: string, updateDefaultProvider: boolean = false) {
     const agentConfig = getProviderAgentConfig(providerId);
     const providerInfo = AVAILABLE_PROVIDERS.find(p => p.id === providerId);
 
@@ -390,6 +390,16 @@ export default function ConfigEditor() {
     if (configToApply.temperature !== undefined) camelCaseConfig.temperature = configToApply.temperature;
     if (configToApply.workspace !== undefined) camelCaseConfig.workspace = configToApply.workspace;
 
+    // 如果需要更新默认 provider，也添加 provider 字段
+    if (updateDefaultProvider) {
+      camelCaseConfig.provider = providerId;
+    }
+
+    // 调试日志
+    console.log("[applyProviderAgentConfig] providerId:", providerId);
+    console.log("[applyProviderAgentConfig] updateDefaultProvider:", updateDefaultProvider);
+    console.log("[applyProviderAgentConfig] camelCaseConfig:", camelCaseConfig);
+
     // 更新 config.agents.defaults
     const updatedConfig = {
       ...config,
@@ -401,6 +411,9 @@ export default function ConfigEditor() {
         },
       },
     };
+
+    console.log("[applyProviderAgentConfig] updatedConfig.agents.defaults:", updatedConfig.agents?.defaults);
+
     setConfig(updatedConfig);
     setSelectedProviderId(providerId); // 标记为已选择
     const providerName = providerInfo?.id || providerId;
@@ -409,11 +422,13 @@ export default function ConfigEditor() {
     // 自动保存
     try {
       const configToSave = cleanConfigForSave(updatedConfig);
+      console.log("[applyProviderAgentConfig] configToSave.agents.defaults:", configToSave.agents?.defaults);
       await configApi.save(configToSave);
       // 同步更新代码编辑器状态
       setOriginalConfig(updatedConfig);
       setCode(JSON.stringify(updatedConfig, null, 2));
     } catch (error) {
+      console.error("[applyProviderAgentConfig] Save error:", error);
       toast.showError(t("config.autoSaveFailed"));
     }
   }
@@ -1512,6 +1527,21 @@ export default function ConfigEditor() {
                       {t("config.execTimeoutDesc")}
                     </p>
                   </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
+                      {t("config.pathAppendLabel")}
+                    </label>
+                    <input
+                      type="text"
+                      value={config.tools?.exec?.pathAppend ?? ""}
+                      onChange={(e) => updateToolsExecConfig("pathAppend", e.target.value)}
+                      placeholder={t("config.pathAppendPlaceholder")}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted"
+                    />
+                    <p className="text-xs text-gray-400 dark:text-dark-text-muted mt-1">
+                      {t("config.pathAppendDesc")}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -1732,6 +1762,7 @@ export default function ConfigEditor() {
             [pid]: hasToken ? (isExpired ? "expired" : true) : false,
           }));
         }}
+        onAutoConfig={(providerId) => applyProviderAgentConfig(providerId, true)}
       />
 
       {/* 渠道编辑模态框 */}
