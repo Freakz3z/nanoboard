@@ -360,26 +360,48 @@ export default function ConfigEditor() {
     const agentConfig = getProviderAgentConfig(providerId);
     const providerInfo = AVAILABLE_PROVIDERS.find(p => p.id === providerId);
 
-    // 如果该 provider 没有保存过配置，使用默认值初始化
-    let configToApply = agentConfig;
-    if (Object.keys(agentConfig).length === 0) {
-      // 使用 provider 的默认配置初始化
+    // 推荐的配置值
+    const recommendedConfig: ProviderAgentConfig = {
+      model: providerInfo?.defaultModel || "",
+      max_tokens: 8192,
+      max_tool_iterations: 20,
+      memory_window: 50,
+      temperature: 0.7,
+      workspace: "~/.nanobot/workspace",
+    };
+
+    // 如果是自动配置（点击了自动配置按钮），使用推荐值覆盖
+    // 否则保留现有配置，只填充未设置的值
+    let configToApply: ProviderAgentConfig;
+    if (updateDefaultProvider) {
+      // 自动配置：使用推荐值，但保留用户已手动修改的值
       configToApply = {
-        model: providerInfo?.defaultModel || "",
-        max_tokens: 8192,
-        max_tool_iterations: 20,
-        memory_window: 50,
-        temperature: 0.7,
-        workspace: "~/.nanobot/workspace",
+        ...recommendedConfig,
+        ...agentConfig,  // 保留用户已设置的值
       };
-      // 同时保存到 localStorage，这样下次切换时就有配置了
-      const updatedConfigs = {
-        ...providerAgentConfigs,
-        [providerId]: configToApply,
-      };
-      setProviderAgentConfigs(updatedConfigs);
-      saveProviderAgentConfigs(updatedConfigs);
+      // 如果用户没有设置 model，使用推荐的 model
+      if (!agentConfig.model) {
+        configToApply.model = recommendedConfig.model;
+      }
+    } else {
+      // 普通应用：合并配置
+      if (Object.keys(agentConfig).length === 0) {
+        configToApply = recommendedConfig;
+      } else {
+        configToApply = {
+          ...recommendedConfig,
+          ...agentConfig,
+        };
+      }
     }
+
+    // 总是更新 providerAgentConfigs 状态和 localStorage
+    const updatedConfigs = {
+      ...providerAgentConfigs,
+      [providerId]: configToApply,
+    };
+    setProviderAgentConfigs(updatedConfigs);
+    saveProviderAgentConfigs(updatedConfigs);
 
     // 将 snake_case (localStorage) 转换为 camelCase (config.json)
     const camelCaseConfig: Record<string, any> = {};
