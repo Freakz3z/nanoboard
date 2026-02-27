@@ -26,7 +26,7 @@ const CUSTOM_PATHS_KEY = "nanoboard_custom_paths";
 // 应用信息
 const APP_INFO = {
   name: "nanoboard",
-  version: "0.2.5",
+  version: "0.2.6",
   description: "一个极轻量化 nanobot Tauri 管理助手",
   descriptionEn: "An Ultra-lightweight nanobot Tauri Management Assistant",
   github: "https://github.com/Freakz3z/nanoboard",

@@ -26,51 +26,39 @@
 <table>
   <tr>
     <td align="center"><b>仪表盘</b></td>
-    <td align="center"><b>会话</b></td>
+    <td align="center"><b>日志</b></td>
   </tr>
   <tr>
     <td align="center"><img src="public/screenshots/dashboard.png" alt="仪表盘" width="400"/></td>
-    <td align="center"><img src="public/screenshots/sessions.png" alt="会话" width="400"/></td>
+    <td align="center"><img src="public/screenshots/logs.png" alt="日志" width="400"/></td>
   </tr>
   <tr>
     <td align="center">监控状态·系统资源</td>
-    <td align="center">多渠道会话·Markdown渲染</td>
-  </tr>
-  <tr>
-    <td align="center"><b>日志</b></td>
-    <td align="center"><b>工作区</b></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="public/screenshots/logs.png" alt="日志" width="400"/></td>
-    <td align="center"><img src="public/screenshots/workspace.png" alt="工作区" width="400"/></td>
-  </tr>
-  <tr>
     <td align="center">实时查看·过滤日志</td>
-    <td align="center">查看会话·管理文件</td>
   </tr>
   <tr>
-    <td align="center"><b>技能</b></td>
-    <td align="center"><b>记忆</b></td>
+    <td align="center"><b>工作区</b></td>
+    <td align="center"><b>技能市场</b></td>
   </tr>
   <tr>
-    <td align="center"><img src="public/screenshots/skills.png" alt="技能" width="400"/></td>
-    <td align="center"><img src="public/screenshots/memory.png" alt="记忆" width="400"/></td>
+    <td align="center"><img src="public/screenshots/workspace.png" alt="工作区" width="400"/></td>
+    <td align="center"><img src="public/screenshots/skillsmarket.png" alt="技能市场" width="400"/></td>
   </tr>
   <tr>
-    <td align="center">可视化管理·一键开关</td>
-    <td align="center">记忆管理·编辑删除</td>
+    <td align="center">文件·技能·记忆·会话·定时</td>
+    <td align="center">ClawHub 技能·一键安装</td>
   </tr>
   <tr>
-    <td align="center"><b>定时任务</b></td>
     <td align="center"><b>设置</b></td>
+    <td align="center"><b>关于</b></td>
   </tr>
   <tr>
-    <td align="center"><img src="public/screenshots/cron.png" alt="定时任务" width="400"/></td>
     <td align="center"><img src="public/screenshots/settings.png" alt="设置" width="400"/></td>
+    <td align="center"><img src="public/screenshots/about.png" alt="关于" width="400"/></td>
   </tr>
   <tr>
-    <td align="center">定时任务·自动执行</td>
     <td align="center">可视化配置·快速编辑</td>
+    <td align="center">版本信息·系统详情</td>
   </tr>
 </table>
 
@@ -165,7 +153,7 @@ nanoboard/
 │   ├── App.tsx            # 主应用组件
 │   └── main.tsx           # 应用入口
 ├── src-tauri/             # Rust 后端
-│   ├── src/                   # Rust 源码    
+│   ├── src/                   # Rust 源码
 │   ├── Cargo.toml             # Rust 依赖配置
 │   └── tauri.conf.json        # Tauri 配置
 ├── public/                # 公共静态资源
@@ -191,11 +179,12 @@ nanoboard/
 - [x] 技能管理（启用/禁用/编辑）
 - [x] 记忆管理（查看/编辑/删除）
 - [x] 定时任务管理
+- [x] ClawHub 技能市场
 - [ ] 自动更新功能
 
 ## 致谢
 
-- [nanobot](https://github.com/HKUDS/nanobot)
+[nanobot](https://github.com/HKUDS/nanobot)·[ClawHub](https://clawhub.ai/)
 
 ## 贡献者
 

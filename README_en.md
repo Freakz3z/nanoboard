@@ -14,7 +14,6 @@ English | **[简体中文](README.md)**
 
 </div>
 
-
 - **Visualization** - Visualize everything about your nanobot! From config files to system resources, from session logs to skills and memory, nanoboard provides an intuitive interface to manage and monitor your nanobot.
 - **Convenience** - Say goodbye to complex command-line operations. With nanoboard's user-friendly interface, managing and monitoring your nanobot becomes simple and efficient, allowing you to focus on what matters most!
 - **Cross-platform** - Whether you're on Windows, Mac, or Linux, nanoboard has you covered with seamless cross-platform support, ensuring a consistent experience across all your devices!
@@ -27,51 +26,39 @@ English | **[简体中文](README.md)**
 <table>
   <tr>
     <td align="center"><b>Dashboard</b></td>
-    <td align="center"><b>Sessions</b></td>
+    <td align="center"><b>Logs</b></td>
   </tr>
   <tr>
     <td align="center"><img src="public/screenshots/dashboard.png" alt="Dashboard" width="400"/></td>
-    <td align="center"><img src="public/screenshots/sessions.png" alt="Sessions" width="400"/></td>
+    <td align="center"><img src="public/screenshots/logs.png" alt="Logs" width="400"/></td>
   </tr>
   <tr>
     <td align="center">Status Monitoring·System Resources</td>
-    <td align="center">Multi-channel·Markdown Rendering</td>
-  </tr>
-  <tr>
-    <td align="center"><b>Logs</b></td>
-    <td align="center"><b>Workspace</b></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="public/screenshots/logs.png" alt="Logs" width="400"/></td>
-    <td align="center"><img src="public/screenshots/workspace.png" alt="Workspace" width="400"/></td>
-  </tr>
-  <tr>
     <td align="center">Real-time Viewing·Log Filtering</td>
-    <td align="center">View Sessions·Manage Files</td>
   </tr>
   <tr>
-    <td align="center"><b>Skills</b></td>
-    <td align="center"><b>Memory</b></td>
+    <td align="center"><b>Workspace</b></td>
+    <td align="center"><b>Skills Market</b></td>
   </tr>
   <tr>
-    <td align="center"><img src="public/screenshots/skills.png" alt="Skills" width="400"/></td>
-    <td align="center"><img src="public/screenshots/memory.png" alt="Memory" width="400"/></td>
+    <td align="center"><img src="public/screenshots/workspace.png" alt="Workspace" width="400"/></td>
+    <td align="center"><img src="public/screenshots/skillsmarket.png" alt="Skills Market" width="400"/></td>
   </tr>
   <tr>
-    <td align="center">Visual Management·One-Click Toggle</td>
-    <td align="center">Memory Management·Edit & Delete</td>
+    <td align="center">File·Skills·Memory·Sessions·Cron</td>
+    <td align="center">ClawHub Skills·One-Click Install</td>
   </tr>
   <tr>
-    <td align="center"><b>Cron</b></td>
     <td align="center"><b>Settings</b></td>
+    <td align="center"><b>About</b></td>
   </tr>
   <tr>
-    <td align="center"><img src="public/screenshots/cron.png" alt="Cron" width="400"/></td>
     <td align="center"><img src="public/screenshots/settings.png" alt="Settings" width="400"/></td>
+    <td align="center"><img src="public/screenshots/about.png" alt="About" width="400"/></td>
   </tr>
   <tr>
-    <td align="center">Scheduled Cron Jobs·Auto Execution</td>
     <td align="center">Visual Config·Quick Edit</td>
+    <td align="center">Version Info·System Details</td>
   </tr>
 </table>
 
@@ -192,11 +179,12 @@ nanoboard/
 - [x] Skills management (enable/disable/edit)
 - [x] Memory management (view/edit/delete)
 - [x] Cron jobs management
+- [x] ClawHub Skills Market
 - [ ] Auto-update feature
 
 ## Acknowledgments
 
-- [nanobot](https://github.com/HKUDS/nanobot)
+[nanobot](https://github.com/HKUDS/nanobot)·[ClawHub](https://clawhub.ai/)
 
 ## Contributors
 
