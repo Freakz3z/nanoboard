@@ -34,6 +34,7 @@ export default function McpServerEditModal({
   const [url, setUrl] = useState("");
   const [env, setEnv] = useState("");
   const [headers, setHeaders] = useState("");
+  const [toolTimeout, setToolTimeout] = useState<number>(30);
 
   useEffect(() => {
     if (isOpen) {
@@ -57,6 +58,7 @@ export default function McpServerEditModal({
                 .join("\n")
             : ""
         );
+        setToolTimeout(server.toolTimeout || 30);
       } else {
         setTransport("stdio");
         setName("");
@@ -65,6 +67,7 @@ export default function McpServerEditModal({
         setUrl("");
         setEnv("");
         setHeaders("");
+        setToolTimeout(30);
       }
     }
   }, [isOpen, server, serverId]);
@@ -116,6 +119,11 @@ export default function McpServerEditModal({
           newServer.headers = headersObj;
         }
       }
+    }
+
+    // 添加 toolTimeout（如果不是默认值 30 秒）
+    if (toolTimeout && toolTimeout !== 30) {
+      newServer.toolTimeout = toolTimeout;
     }
 
     onSave(serverName, newServer);
@@ -278,6 +286,29 @@ export default function McpServerEditModal({
                 </div>
               </>
             )}
+
+            {/* Tool Timeout - 通用配置 */}
+            <div>
+              <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
+                {t("mcp.toolTimeout")}
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="600"
+                  value={toolTimeout}
+                  onChange={(e) => setToolTimeout(parseInt(e.target.value) || 30)}
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary"
+                />
+                <span className="text-sm text-gray-500 dark:text-dark-text-muted whitespace-nowrap">
+                  {t("config.seconds")}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 dark:text-dark-text-muted mt-1">
+                {t("mcp.toolTimeoutDesc")}
+              </p>
+            </div>
           </div>
         </div>
 

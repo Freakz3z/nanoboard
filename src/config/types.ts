@@ -114,7 +114,8 @@ export interface McpServer {
   url?: string;
   headers?: Record<string, string>;  // 自定义 HTTP headers (用于认证)
   // 通用配置
-  disabled?: boolean;
+  toolTimeout?: number;  // 工具调用超时时间（秒），默认 30 秒
+  disabled?: boolean;  // 仅用于 UI 状态管理，不保存到 config.json
 }
 
 // MCP Server UI 显示信息

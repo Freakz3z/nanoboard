@@ -692,6 +692,8 @@
     "urlDesc": "SSE endpoint URL of the MCP server",
     "headers": "HTTP Headers",
     "headersDesc": "Custom HTTP headers for authentication. One per line, format: Header-Name: value",
+    "toolTimeout": "Tool Timeout",
+    "toolTimeoutDesc": "Timeout for tool calls in seconds",
     "disabled": "Disabled",
     "add": "Add",
     "serverSaved": "MCP server configuration saved",

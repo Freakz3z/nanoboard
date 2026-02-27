@@ -699,6 +699,8 @@
     "urlDesc": "MCP 服务器的 SSE 端点地址",
     "headers": "HTTP Headers",
     "headersDesc": "自定义 HTTP 请求头，用于认证。每行一个，格式: Header-Name: value",
+    "toolTimeout": "工具超时时间",
+    "toolTimeoutDesc": "工具调用的超时时间（秒）",
     "disabled": "已禁用",
     "add": "添加",
     "serverSaved": "MCP 服务器配置已保存",
