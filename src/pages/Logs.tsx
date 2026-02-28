@@ -4,7 +4,7 @@ import { loggerApi, events } from "../lib/tauri";
 import { useToast } from "../contexts/ToastContext";
 import { Play, Square, Search, X, Inbox, Download, BarChart3, Regex } from "lucide-react";
 import EmptyState from "../components/EmptyState";
-import { Virtuoso } from "react-virtuoso";
+import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { LogItem } from "../components/logs";
 
 interface LogStatistics {
@@ -49,6 +49,7 @@ export default function Logs() {
     debugPercent: 0, infoPercent: 0, warnPercent: 0, errorPercent: 0,
   });
   const unlistenRef = useRef<(() => void) | null>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -224,6 +225,16 @@ export default function Logs() {
         });
 
         unlistenRef.current = unlisten;
+        
+        // 开始监控时滚动到底部
+        setTimeout(() => {
+          virtuosoRef.current?.scrollToIndex({
+            index: logs.length - 1,
+            align: 'end',
+            behavior: 'smooth'
+          });
+        }, 100);
+        
         toast.showSuccess(t("logs.startMonitoring"));
       } catch (error) {
         let errorMessage = t("logs.startMonitoringFailed");
@@ -408,10 +419,11 @@ export default function Logs() {
       ) : (
         <div className="flex-1 overflow-hidden">
           <Virtuoso
+            ref={virtuosoRef}
             style={{ height: '100%' }}
             data={filteredLogs}
             itemContent={(_index, log) => <LogItem log={log} />}
-            followOutput="smooth"
+            followOutput={streaming ? 'smooth' : false}
           />
         </div>
       )}

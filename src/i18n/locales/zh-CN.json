@@ -576,7 +576,10 @@
     "minutesAgo": "{{count}} 分钟前",
     "hoursAgo": "{{count}} 小时前",
     "yesterday": "昨天",
-    "daysAgo": "{{count}} 天前"
+    "daysAgo": "{{count}} 天前",
+    "install": "安装",
+    "uninstall": "卸载",
+    "viewDetails": "查看详情"
   },
   "memory": {
     "title": "记忆管理",

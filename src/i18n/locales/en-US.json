@@ -567,7 +567,10 @@
     "minutesAgo": "{{count}} minute(s) ago",
     "hoursAgo": "{{count}} hour(s) ago",
     "yesterday": "Yesterday",
-    "daysAgo": "{{count}} day(s) ago"
+    "daysAgo": "{{count}} day(s) ago",
+    "install": "Install",
+    "uninstall": "Uninstall",
+    "viewDetails": "View Details"
   },
   "memory": {
     "title": "Memory",

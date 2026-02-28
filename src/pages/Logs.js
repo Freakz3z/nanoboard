@@ -39,6 +39,7 @@ export default function Logs() {
         debugPercent: 0, infoPercent: 0, warnPercent: 0, errorPercent: 0,
     });
     const unlistenRef = useRef(null);
+    const virtuosoRef = useRef(null);
     const toast = useToast();
     useEffect(() => {
         loadLogs();
@@ -234,6 +235,14 @@ export default function Logs() {
                     setLogs((prev) => [...prev, ...newLogs]);
                 });
                 unlistenRef.current = unlisten;
+                // 开始监控时滚动到底部
+                setTimeout(() => {
+                    virtuosoRef.current?.scrollToIndex({
+                        index: logs.length - 1,
+                        align: 'end',
+                        behavior: 'smooth'
+                    });
+                }, 100);
                 toast.showSuccess(t("logs.startMonitoring"));
             }
             catch (error) {
@@ -271,5 +280,5 @@ export default function Logs() {
                                     const count = statistics[level];
                                     const percent = statistics[`${level}Percent`];
                                     return (_jsxs("div", { children: [_jsxs("div", { className: "flex items-center justify-between text-xs mb-1", children: [_jsx("span", { className: `${colors[level].split(" ")[1]} dark:${colors[level].split(" ")[1]} font-medium`, children: level.toUpperCase() }), _jsxs("span", { className: "text-gray-600 dark:text-dark-text-secondary", children: [count, " ", t("dashboard.entries"), " (", percent.toFixed(1), "%)"] })] }), _jsx("div", { className: "w-full bg-gray-200 dark:bg-dark-bg-hover rounded-full h-2", children: _jsx("div", { className: `${colors[level].split(" ")[0]} h-2 rounded-full transition-all duration-300`, style: { width: `${percent}%` } }) })] }, level));
-                                }) })] }) }) })), loading ? (_jsx("div", { className: "flex-1 flex items-center justify-center bg-gray-50 dark:bg-dark-bg-sidebar text-gray-500 dark:text-dark-text-muted", children: t("config.loading") })) : filteredLogs.length === 0 ? (_jsx(EmptyState, { icon: Inbox, title: searchQuery ? t("logs.noMatchingLogs") : t("logs.noLogs"), description: searchQuery ? t("logs.tryDifferentKeywords") : t("logs.startNanobotForLogs") })) : (_jsx("div", { className: "flex-1 overflow-hidden", children: _jsx(Virtuoso, { style: { height: '100%' }, data: filteredLogs, itemContent: (_index, log) => _jsx(LogItem, { log: log }), followOutput: "smooth" }) })), _jsxs("div", { className: "bg-white dark:bg-dark-bg-card border-t border-gray-200 dark:border-dark-border-subtle px-4 py-2 flex items-center justify-between text-sm text-gray-500 dark:text-dark-text-muted transition-colors duration-200", children: [_jsx("span", { children: searchQuery ? t("logs.displayLogs", { filtered: filteredLogs.length, total: logs.length }) : t("logs.totalLogs", { total: logs.length }) }), _jsx("span", { children: streaming ? (_jsxs("span", { className: "text-green-600 dark:text-green-400", children: ["\u25CF ", t("logs.realtimeMonitoring")] })) : (_jsxs("span", { className: "text-amber-600 dark:text-amber-400", children: ["\u25CF ", t("logs.paused")] })) })] })] }));
+                                }) })] }) }) })), loading ? (_jsx("div", { className: "flex-1 flex items-center justify-center bg-gray-50 dark:bg-dark-bg-sidebar text-gray-500 dark:text-dark-text-muted", children: t("config.loading") })) : filteredLogs.length === 0 ? (_jsx(EmptyState, { icon: Inbox, title: searchQuery ? t("logs.noMatchingLogs") : t("logs.noLogs"), description: searchQuery ? t("logs.tryDifferentKeywords") : t("logs.startNanobotForLogs") })) : (_jsx("div", { className: "flex-1 overflow-hidden", children: _jsx(Virtuoso, { ref: virtuosoRef, style: { height: '100%' }, data: filteredLogs, itemContent: (_index, log) => _jsx(LogItem, { log: log }), followOutput: streaming ? 'smooth' : false }) })), _jsxs("div", { className: "bg-white dark:bg-dark-bg-card border-t border-gray-200 dark:border-dark-border-subtle px-4 py-2 flex items-center justify-between text-sm text-gray-500 dark:text-dark-text-muted transition-colors duration-200", children: [_jsx("span", { children: searchQuery ? t("logs.displayLogs", { filtered: filteredLogs.length, total: logs.length }) : t("logs.totalLogs", { total: logs.length }) }), _jsx("span", { children: streaming ? (_jsxs("span", { className: "text-green-600 dark:text-green-400", children: ["\u25CF ", t("logs.realtimeMonitoring")] })) : (_jsxs("span", { className: "text-amber-600 dark:text-amber-400", children: ["\u25CF ", t("logs.paused")] })) })] })] }));
 }
