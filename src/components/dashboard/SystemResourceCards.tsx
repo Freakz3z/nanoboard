@@ -21,65 +21,63 @@ export default function SystemResourceCards({ systemInfo, logStatistics, network
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* 性能监控 */}
-      <div className="p-5 bg-white dark:bg-dark-bg-card rounded-lg border border-gray-200 dark:border-dark-border-subtle card-hover transition-colors duration-200">
-        <div className="flex items-center justify-between mb-4">
-          <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
-            <Activity className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-          </div>
-          <span className="text-xs font-medium text-gray-500 dark:text-dark-text-muted">{t("dashboard.performanceMonitoring")}</span>
+      <div className="p-5 bg-white dark:bg-dark-bg-card rounded-xl border border-gray-200 dark:border-dark-border-subtle transition-colors duration-200">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-5 h-5 text-indigo-500" />
+          <span className="text-base font-medium text-gray-700 dark:text-dark-text-primary">{t("dashboard.performanceMonitoring")}</span>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-4">
           {/* CPU */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1.5">
-                <Cpu className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                <span className="text-xs text-gray-600 dark:text-dark-text-secondary">{t("dashboard.cpu")}</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-blue-500" />
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary">{t("dashboard.cpu")}</span>
               </div>
-              <span className="text-xs font-medium text-gray-700 dark:text-dark-text-primary">{systemInfo.cpu.usage_text}</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-dark-text-primary">{systemInfo.cpu.usage_text}</span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-dark-bg-hover rounded-full h-1.5">
+            <div className="w-full bg-gray-100 dark:bg-dark-bg-hover rounded-full h-2">
               <div
-                className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
+                className="bg-blue-500 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(systemInfo.cpu.usage, 100)}%` }}
               />
             </div>
           </div>
           {/* 内存 */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1.5">
-                <HardDrive className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
-                <span className="text-xs text-gray-600 dark:text-dark-text-secondary">{t("dashboard.memory")}</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <HardDrive className="w-4 h-4 text-green-500" />
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary">{t("dashboard.memory")}</span>
               </div>
-              <span className="text-xs font-medium text-gray-700 dark:text-dark-text-primary">{systemInfo.memory.usage_text}</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-dark-text-primary">{systemInfo.memory.usage_text}</span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-dark-bg-hover rounded-full h-1.5">
+            <div className="w-full bg-gray-100 dark:bg-dark-bg-hover rounded-full h-2">
               <div
-                className="bg-green-600 h-1.5 rounded-full transition-all duration-500"
+                className="bg-green-500 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(systemInfo.memory.usage_percent, 100)}%` }}
               />
             </div>
-            <p className="text-xs text-gray-500 dark:text-dark-text-muted mt-1">
+            <p className="text-xs text-gray-400 dark:text-dark-text-muted mt-1">
               {systemInfo.memory.used_text} / {systemInfo.memory.total_text}
             </p>
           </div>
           {/* 交换空间 */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                <span className="text-xs text-gray-600 dark:text-dark-text-secondary">{t("dashboard.swap")}</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-purple-500" />
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary">{t("dashboard.swap")}</span>
               </div>
-              <span className="text-xs font-medium text-gray-700 dark:text-dark-text-primary">{systemInfo.swap.usage_text}</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-dark-text-primary">{systemInfo.swap.usage_text}</span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-dark-bg-hover rounded-full h-1.5">
+            <div className="w-full bg-gray-100 dark:bg-dark-bg-hover rounded-full h-2">
               <div
-                className="bg-purple-600 h-1.5 rounded-full transition-all duration-500"
+                className="bg-purple-500 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(systemInfo.swap.usage_percent, 100)}%` }}
               />
             </div>
-            <p className="text-xs text-gray-500 dark:text-dark-text-muted mt-1">
+            <p className="text-xs text-gray-400 dark:text-dark-text-muted mt-1">
               {systemInfo.swap.used_text} / {systemInfo.swap.total_text}
             </p>
           </div>
@@ -87,13 +85,11 @@ export default function SystemResourceCards({ systemInfo, logStatistics, network
       </div>
 
       {/* 网络监控折线图 */}
-      <div className="bg-white dark:bg-dark-bg-card rounded-lg border border-gray-200 dark:border-dark-border-subtle card-hover overflow-hidden transition-colors duration-200">
+      <div className="bg-white dark:bg-dark-bg-card rounded-xl border border-gray-200 dark:border-dark-border-subtle overflow-hidden transition-colors duration-200">
         <div className="p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="p-2 bg-cyan-50 dark:bg-cyan-900/30 rounded-lg">
-              <TrendingUp className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-            </div>
-            <span className="text-xs font-medium text-gray-500 dark:text-dark-text-muted">{t("dashboard.networkMonitoring")}</span>
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-5 h-5 text-cyan-500" />
+            <span className="text-base font-medium text-gray-700 dark:text-dark-text-primary">{t("dashboard.networkMonitoring")}</span>
           </div>
           <NetworkMonitor data={networkData} />
         </div>
@@ -101,48 +97,48 @@ export default function SystemResourceCards({ systemInfo, logStatistics, network
 
       {/* 日志监控 */}
       {logStatistics && (
-        <div className="p-5 bg-white dark:bg-dark-bg-card rounded-lg border border-gray-200 dark:border-dark-border-subtle card-hover transition-colors duration-200">
-          <div className="flex items-center justify-between mb-3">
-            <div className="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-lg">
-              <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+        <div className="p-5 bg-white dark:bg-dark-bg-card rounded-xl border border-gray-200 dark:border-dark-border-subtle transition-colors duration-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-amber-500" />
+              <span className="text-base font-medium text-gray-700 dark:text-dark-text-primary">{t("dashboard.logStatistics")}</span>
             </div>
-            <span className="text-sm font-medium text-gray-700 dark:text-dark-text-primary">
+            <span className="text-sm text-gray-500 dark:text-dark-text-muted">
               {logStatistics.total} {t("dashboard.entries")}
             </span>
           </div>
-          <p className="text-xs text-gray-500 dark:text-dark-text-muted mb-3">{t("dashboard.logStatistics")}</p>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {/* DEBUG */}
             <LogProgressBar
               label="DEBUG"
               count={logStatistics.debug}
               total={logStatistics.total}
-              colorClass="bg-gray-600"
-              labelColorClass="text-gray-600 dark:text-gray-400"
+              colorClass="bg-gray-500"
+              labelColorClass="text-gray-500"
             />
             {/* INFO */}
             <LogProgressBar
               label="INFO"
               count={logStatistics.info}
               total={logStatistics.total}
-              colorClass="bg-blue-600"
-              labelColorClass="text-blue-600 dark:text-blue-400"
+              colorClass="bg-blue-500"
+              labelColorClass="text-blue-500"
             />
             {/* WARN */}
             <LogProgressBar
               label="WARN"
               count={logStatistics.warn}
               total={logStatistics.total}
-              colorClass="bg-amber-600"
-              labelColorClass="text-amber-600 dark:text-amber-400"
+              colorClass="bg-amber-500"
+              labelColorClass="text-amber-500"
             />
             {/* ERROR */}
             <LogProgressBar
               label="ERROR"
               count={logStatistics.error}
               total={logStatistics.total}
-              colorClass="bg-red-600"
-              labelColorClass="text-red-600 dark:text-red-400"
+              colorClass="bg-red-500"
+              labelColorClass="text-red-500"
             />
           </div>
         </div>
@@ -168,13 +164,13 @@ function LogProgressBar({
 
   return (
     <div>
-      <div className="flex items-center justify-between text-xs mb-1">
+      <div className="flex items-center justify-between text-sm mb-1">
         <span className={labelColorClass}>{label}</span>
-        <span className="text-gray-700 dark:text-dark-text-primary font-medium">
+        <span className="text-gray-600 dark:text-dark-text-secondary font-medium">
           {count} ({percentage}%)
         </span>
       </div>
-      <div className="w-full bg-gray-200 dark:bg-dark-bg-hover rounded-full h-1.5">
+      <div className="w-full bg-gray-100 dark:bg-dark-bg-hover rounded-full h-1.5">
         <div
           className={`${colorClass} h-1.5 rounded-full transition-all duration-500`}
           style={{ width: `${total > 0 ? (count / total) * 100 : 0}%` }}

@@ -264,7 +264,11 @@ export default function Workspace() {
     try {
       const result = await fsApi.getDirectoryTree(path || undefined);
       if (result.success) {
-        setItems(result.items || []);
+        // 过滤掉 sessions 文件夹（在专门的"会话"Tab 中显示）
+        const filteredItems = (result.items || []).filter(
+          (item: FsItem) => item.name !== "sessions"
+        );
+        setItems(filteredItems);
         setCurrentPath(result.path || "");
         setSelectedItem(null);
         setFileContent("");

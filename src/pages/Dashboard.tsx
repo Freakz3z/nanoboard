@@ -132,7 +132,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 scrollbar-thin bg-white dark:bg-dark-bg-base transition-colors duration-200">
+    <div className="flex-1 overflow-y-auto p-6 scrollbar-thin bg-white dark:bg-dark-bg-base transition-colors duration-200">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* 状态卡片 */}
         <StatusCards status={status} nanobotVersion={nanobotVersion} />
