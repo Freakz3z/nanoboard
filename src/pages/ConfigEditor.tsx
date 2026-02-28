@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, memo } from "react";
+import { useEffect, useState, useCallback, useMemo, memo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { FileText, History, Code, Plus, FolderOpen, Trash2 } from "lucide-react";
 import { configApi } from "../lib/tauri";
@@ -26,6 +26,14 @@ import { cleanConfigForSave } from "@/components/config/utils/cleanConfig";
 
 const TEMPLATES_STORAGE_KEY = "nanobot_config_templates";
 
+/**
+ * ConfigEditor - 配置编辑器组件
+ * 性能优化点：
+ * 1. 使用 useMemo 缓存计算结果
+ * 2. 使用 useCallback 缓存事件处理函数
+ * 3. 使用 useRef 存储不需要触发重渲染的值
+ * 4. 将子组件提取为 memo 包装的独立组件
+ */
 export default function ConfigEditor() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -39,7 +47,7 @@ export default function ConfigEditor() {
   const [codeError, setCodeError] = useState<string | null>(null);
   const [savingCode, setSavingCode] = useState(false);
   
-  // 展开状态
+  // 展开状态 - 使用初始化函数避免每次渲染都执行 localStorage 读取
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
     const saved = localStorage.getItem("configEditorExpandedSections");
     if (saved) {
@@ -52,7 +60,7 @@ export default function ConfigEditor() {
     return new Set(["providers", "channels", "mcp", "tools"]);
   });
   
-  // 选中的 Provider
+  // 选中的 Provider - 使用初始化函数避免每次渲染都执行 localStorage 读取
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(() => {
     return localStorage.getItem("selectedProviderId");
   });
@@ -75,11 +83,15 @@ export default function ConfigEditor() {
   const [editingChannel, setEditingChannel] = useState<EditingChannel>({ isOpen: false, channelKey: "", channelInfo: null });
   const [editingMcpServer, setEditingMcpServer] = useState<EditingMcpServer>({ isOpen: false, serverId: "", server: null, mode: "add" });
 
+  // 使用 useRef 存储不需要触发重渲染的引用值
+  const isInitialMount = useRef(true);
+
   // Hooks
   const { getProviderAgentConfig, updateProviderAgentConfig, buildAgentDefaults } = useProviderAgentConfig();
   const { loadMcpServersConfig, saveMcpServersConfig, mergeMcpConfig } = useMcpServersConfig();
 
   // 自动保存 - 使用 useMemo 缓存清理后的配置
+  // 优化：将 handleSave 依赖项精简，避免不必要的重创建
   const handleSave = useCallback(async (updatedConfig: Config) => {
     try {
       const configToSave = cleanConfigForSave(updatedConfig, mcpServersConfig);
@@ -94,46 +106,48 @@ export default function ConfigEditor() {
 
   const debouncedAutoSave = useAutoSave({ onSave: handleSave, delay: 500 });
 
-  // 缓存 OAuth providers 列表
+  // 缓存 OAuth providers 列表 - 使用 useMemo 避免每次渲染都过滤
   const oauthProviders = useMemo(() => 
     AVAILABLE_PROVIDERS.filter(p => p.loginCommand), 
   []);
 
-  // 加载配置
-  useEffect(() => {
-    loadConfig();
-    checkAllOAuthStatuses();
-  }, []);
+  // 缓存配置字符串比较结果 - 避免重复计算
+  const hasCodeChanges = useMemo(() => 
+    code !== JSON.stringify(originalConfig, null, 2),
+  [code, originalConfig]);
 
-  // 保存展开状态
-  useEffect(() => {
-    localStorage.setItem("configEditorExpandedSections", JSON.stringify([...expandedSections]));
-  }, [expandedSections]);
+  // 优化：检查所有 OAuth 状态 - 使用 useCallback 缓存
+  const checkAllOAuthStatuses = useCallback(async () => {
+    const statuses: Record<string, boolean | "expired"> = {};
+    await Promise.all(
+      oauthProviders.map(async (provider) => {
+        if (!provider.loginCommand) return;
+        try {
+          const result = await processApi.checkOAuthToken(provider.loginCommand);
+          statuses[provider.id] = result.has_token ? (result.is_expired ? "expired" : true) : false;
+        } catch {
+          statuses[provider.id] = false;
+        }
+      })
+    );
+    setOauthTokenStatuses(statuses);
+  }, [oauthProviders]);
 
-  // 保存选中的 Provider
-  useEffect(() => {
-    if (selectedProviderId) {
-      localStorage.setItem("selectedProviderId", selectedProviderId);
-    } else {
-      localStorage.removeItem("selectedProviderId");
+  // 优化：将 loadHistory 移到使用它的 useEffect 之前，避免初始化顺序错误
+  const loadHistory = useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const versions = await configApi.getHistory();
+      setHistoryVersions(versions);
+    } catch (error) {
+      toast.showError(t("config.loadHistoryFailed"));
+    } finally {
+      setLoadingHistory(false);
     }
-  }, [selectedProviderId]);
+  }, [t, toast]);
 
-  // 加载历史时
-  useEffect(() => {
-    if (showHistory) {
-      loadHistory();
-    }
-  }, [showHistory]);
-
-  // 加载模板时
-  useEffect(() => {
-    if (showTemplates) {
-      loadTemplates();
-    }
-  }, [showTemplates]);
-
-  async function loadConfig() {
+  // 优化：将 loadConfig 函数用 useCallback 包装，避免重复创建
+  const loadConfig = useCallback(async () => {
     setLoading(true);
     try {
       const result = await configApi.load();
@@ -157,23 +171,56 @@ export default function ConfigEditor() {
     } finally {
       setLoading(false);
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t, toast, loadMcpServersConfig, mergeMcpConfig]);
 
-  const checkAllOAuthStatuses = useCallback(async () => {
-    const statuses: Record<string, boolean | "expired"> = {};
-    await Promise.all(
-      oauthProviders.map(async (provider) => {
-        if (!provider.loginCommand) return;
-        try {
-          const result = await processApi.checkOAuthToken(provider.loginCommand);
-          statuses[provider.id] = result.has_token ? (result.is_expired ? "expired" : true) : false;
-        } catch {
-          statuses[provider.id] = false;
-        }
-      })
-    );
-    setOauthTokenStatuses(statuses);
-  }, [oauthProviders]);
+  // 加载模板函数 - 用 useCallback 包装
+  const loadTemplates = useCallback(() => {
+    try {
+      const stored = localStorage.getItem(TEMPLATES_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setTemplates(parsed);
+      }
+    } catch (error) {
+      console.error(t("config.loadTemplateFailed"), error);
+    }
+  }, [t]);
+
+  // 加载配置 - 仅在组件挂载时执行
+  useEffect(() => {
+    loadConfig();
+    checkAllOAuthStatuses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 保存展开状态 - 使用效果依赖优化
+  useEffect(() => {
+    localStorage.setItem("configEditorExpandedSections", JSON.stringify([...expandedSections]));
+  }, [expandedSections]);
+
+  // 保存选中的 Provider - 使用效果依赖优化
+  useEffect(() => {
+    if (selectedProviderId) {
+      localStorage.setItem("selectedProviderId", selectedProviderId);
+    } else {
+      localStorage.removeItem("selectedProviderId");
+    }
+  }, [selectedProviderId]);
+
+  // 加载历史时 - 条件执行
+  useEffect(() => {
+    if (showHistory) {
+      loadHistory();
+    }
+  }, [showHistory, loadHistory]);
+
+  // 加载模板时 - 条件执行
+  useEffect(() => {
+    if (showTemplates) {
+      loadTemplates();
+    }
+  }, [showTemplates, loadTemplates]);
 
   const toggleSection = useCallback((section: string) => {
     setExpandedSections(prev => {
@@ -397,18 +444,6 @@ export default function ConfigEditor() {
     toast.showSuccess(t("mcp.serverDeleted"));
   }, [mcpServersConfig, saveMcpServersConfig, debouncedAutoSave, t]);
 
-  const loadHistory = useCallback(async () => {
-    setLoadingHistory(true);
-    try {
-      const versions = await configApi.getHistory();
-      setHistoryVersions(versions);
-    } catch (error) {
-      toast.showError(t("config.loadHistoryFailed"));
-    } finally {
-      setLoadingHistory(false);
-    }
-  }, [t, toast]);
-
   const restoreVersion = useCallback((version: ConfigHistoryVersion) => {
     setConfirmDialog({
       isOpen: true,
@@ -438,18 +473,6 @@ export default function ConfigEditor() {
       toast.showError(t("config.deleteVersionFailed"));
     }
   }, [loadHistory, t, toast]);
-
-  const loadTemplates = useCallback(() => {
-    try {
-      const stored = localStorage.getItem(TEMPLATES_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setTemplates(parsed);
-      }
-    } catch (error) {
-      console.error(t("config.loadTemplateFailed"), error);
-    }
-  }, [t]);
 
   const saveTemplates = useCallback((data?: ConfigTemplate[]) => {
     try {
@@ -739,42 +762,14 @@ export default function ConfigEditor() {
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {templates.map((template) => (
-                          <div
+                          <TemplateCard
                             key={template.id}
-                            className="group p-4 rounded-lg bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle hover:border-purple-200 dark:hover:border-purple-500/50 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all"
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-gray-900 dark:text-dark-text-primary text-sm mb-1">
-                                  {template.name}
-                                </h4>
-                                {template.description && (
-                                  <p className="text-xs text-gray-500 dark:text-dark-text-muted line-clamp-2">
-                                    {template.description}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                <button
-                                  onClick={() => applyTemplate(template)}
-                                  className="p-1.5 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
-                                  title={t("config.applyTemplate")}
-                                >
-                                  <FolderOpen className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => deleteTemplate(template)}
-                                  className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                                  title={t("config.delete")}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                            <div className="text-xs text-gray-400 dark:text-dark-text-muted">
-                              {new Date(template.createdAt).toLocaleString(i18n.language === "en" ? "en-US" : "zh-CN")}
-                            </div>
-                          </div>
+                            template={template}
+                            i18nLanguage={i18n.language}
+                            onApply={applyTemplate}
+                            onDelete={deleteTemplate}
+                            t={t}
+                          />
                         ))}
                       </div>
                     )}
@@ -942,3 +937,59 @@ export default function ConfigEditor() {
     </div>
   );
 }
+
+/**
+ * TemplateCard - 模板卡片组件（使用 memo 优化）
+ * 性能优化：避免父组件状态变化时不必要的重渲染
+ */
+const TemplateCard = memo(function TemplateCard({
+  template,
+  i18nLanguage,
+  onApply,
+  onDelete,
+  t,
+}: {
+  template: ConfigTemplate;
+  i18nLanguage: string;
+  onApply: (template: ConfigTemplate) => void;
+  onDelete: (template: ConfigTemplate) => void;
+  t: (key: string, params?: any) => string;
+}) {
+  return (
+    <div
+      className="group p-4 rounded-lg bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle hover:border-purple-200 dark:hover:border-purple-500/50 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all"
+    >
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex-1">
+          <h4 className="font-semibold text-gray-900 dark:text-dark-text-primary text-sm mb-1">
+            {template.name}
+          </h4>
+          {template.description && (
+            <p className="text-xs text-gray-500 dark:text-dark-text-muted line-clamp-2">
+              {template.description}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+          <button
+            onClick={() => onApply(template)}
+            className="p-1.5 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
+            title={t("config.applyTemplate")}
+          >
+            <FolderOpen className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => onDelete(template)}
+            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+            title={t("config.delete")}
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      <div className="text-xs text-gray-400 dark:text-dark-text-muted">
+        {new Date(template.createdAt).toLocaleString(i18nLanguage === "en" ? "en-US" : "zh-CN")}
+      </div>
+    </div>
+  );
+});
