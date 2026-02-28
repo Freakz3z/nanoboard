@@ -32,7 +32,8 @@ export default function SkillList({
     const query = searchQuery.toLowerCase();
     return (
       skill.name.toLowerCase().includes(query) ||
-      (skill.title && skill.title.toLowerCase().includes(query))
+      (skill.title && skill.title.toLowerCase().includes(query)) ||
+      (skill.description && skill.description.toLowerCase().includes(query))
     );
   });
 
@@ -75,7 +76,12 @@ export default function SkillList({
                   {skill.enabled ? t("workspace.enabled") : t("workspace.disabled")}
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-dark-text-muted mt-0.5">
+              {skill.description && (
+                <p className="text-xs text-gray-500 dark:text-dark-text-muted mt-1 line-clamp-2">
+                  {skill.description}
+                </p>
+              )}
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-dark-text-muted mt-1">
                 <span className="flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   {formatTimestamp(skill.modified || 0, t, i18n)}
