@@ -247,10 +247,10 @@ export interface ProviderInfo {
   nameKey: string;
   icon: string;
   colorClass: string;
-  apiBase: string;
-  apiUrl: string;
+  apiBase?: string;
+  apiUrl?: string;
   defaultModel: string;
-  models: string[];
+  models?: string[];
   authType?: "api_key" | "oauth";
   loginCommand?: string;
 }

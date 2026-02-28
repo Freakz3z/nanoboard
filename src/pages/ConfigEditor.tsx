@@ -1,218 +1,111 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import { FileText, History, Code, Plus, FolderOpen, Trash2 } from "lucide-react";
 import { configApi } from "../lib/tauri";
 import { useToast } from "../contexts/ToastContext";
-import {
-  ChevronDown,
-  ChevronUp,
-  Plus,
-  Trash2,
-  Settings,
-  Bot,
-  Brain,
-  Search,
-  Network,
-  Zap,
-  Target,
-  Cpu,
-  Server,
-  MessageSquare,
-  Inbox,
-  History,
-  Copy,
-  FolderOpen,
-  Code,
-  Shield,
-  Plug,
-  Terminal,
-  Globe,
-  FileText,
-  Wrench,
-  Sparkles,
-  Radio,
-} from "lucide-react";
+import { DEFAULT_CONFIG } from "../lib/defaultConfig";
+import { AVAILABLE_PROVIDERS } from "@/config/providers";
+import type { Config, ConfigTemplate, ConfigHistoryVersion, EditingProvider, EditingChannel, EditingMcpServer, ConfirmDialogState, TemplateDialogState, McpServerWithState } from "@/types/config";
+import { processApi } from "@/lib/tauri";
+import { formatTimestamp } from "@/utils/format";
 import EmptyState from "../components/EmptyState";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { DEFAULT_CONFIG } from "../lib/defaultConfig";
-
-// 导入模块化的类型和数据
-import type {
-  Config,
-  ConfigTemplate,
-  ConfigHistoryVersion,
-  ProviderAgentConfig,
-  ProviderInfo,
-  ChannelInfo,
-  Provider,
-  McpServer,
-} from "@/config/types";
-import { AVAILABLE_PROVIDERS, isProviderConfigured, isOAuthProvider } from "@/config/providers";
-import { processApi } from "@/lib/tauri";
-import { CHANNELS_CONFIG } from "@/config/channels";
-import { formatTimestamp } from "@/utils/format";
 import ProviderEditModal from "@/components/config/ProviderEditModal";
 import ChannelEditModal from "@/components/config/ChannelEditModal";
 import McpServerEditModal from "@/components/config/McpServerEditModal";
 import HistoryPanel from "@/components/config/HistoryPanel";
 import CodeEditorView from "@/components/config/CodeEditorView";
+import ProviderSection from "@/components/config/sections/ProviderSection";
+import ChannelSection from "@/components/config/sections/ChannelSection";
+import McpServerSection from "@/components/config/sections/McpServerSection";
+import ToolsSection from "@/components/config/sections/ToolsSection";
+import { useProviderAgentConfig } from "@/components/config/hooks/useProviderAgentConfig";
+import { useMcpServersConfig } from "@/components/config/hooks/useMcpServersConfig";
+import { useAutoSave } from "@/hooks/useAutoSave";
+import { cleanConfigForSave } from "@/components/config/utils/cleanConfig";
 
 const TEMPLATES_STORAGE_KEY = "nanobot_config_templates";
-const MCP_SERVERS_STORAGE_KEY = "nanoboard_mcp_servers";
-// 每个 Provider 独立的 Agent 配置存储 key
-const PROVIDER_AGENT_CONFIGS_KEY = "nanoboard_provider_agent_configs";
-
-// MCP Server 配置（包含 disabled 字段用于 UI 状态管理）
-interface McpServerWithState extends McpServer {
-  disabled?: boolean;
-}
-
-// 图标映射组件
-const ProviderIcon = ({ name, className }: { name: string; className?: string }) => {
-  const icons: Record<string, React.ComponentType<{ className?: string }>> = {
-    Bot,
-    Brain,
-    Search,
-    Network,
-    Zap,
-    Target,
-    Cpu,
-    Server,
-  };
-
-  const IconComponent = icons[name] || Bot;
-  return <IconComponent className={className} />;
-};
 
 export default function ConfigEditor() {
   const { t, i18n } = useTranslation();
+  const toast = useToast();
+  
+  // 状态
   const [config, setConfig] = useState<Config>({});
   const [loading, setLoading] = useState(true);
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
-    // 从 localStorage 加载展开状态，如果没有则使用默认值
-    const savedExpanded = localStorage.getItem("configEditorExpandedSections");
-    if (savedExpanded) {
-      try {
-        const parsed = JSON.parse(savedExpanded);
-        return new Set(parsed);
-      } catch (e) {
-        console.error("Failed to load expanded sections:", e);
-      }
-    }
-    return new Set(["providers", "channels", "mcp", "tools", "security"]);
-  });
-  const [editingProvider, setEditingProvider] = useState<{
-    isOpen: boolean;
-    providerId: string;
-    providerInfo: ProviderInfo | null;
-    activeTab: "api" | "agent";
-  }>({ isOpen: false, providerId: "", providerInfo: null, activeTab: "api" });
-  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(() => {
-    return localStorage.getItem("selectedProviderId");
-  });
-  const [mcpServersConfig, setMcpServersConfig] = useState<Record<string, McpServerWithState>>({});
-  // OAuth provider token 状态：true=已登录, false=未登录, "expired"=已过期
-  const [oauthTokenStatuses, setOauthTokenStatuses] = useState<Record<string, boolean | "expired">>({});
-
-
-  const [showHistory, setShowHistory] = useState(false);
-  const [historyVersions, setHistoryVersions] = useState<ConfigHistoryVersion[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [templates, setTemplates] = useState<ConfigTemplate[]>([]);
-  const [templateDialog, setTemplateDialog] = useState<{
-    isOpen: boolean;
-    mode: "save" | "edit";
-    template?: ConfigTemplate;
-    name: string;
-    description: string;
-  }>({ isOpen: false, mode: "save", name: "", description: "" });
-  const [editingChannel, setEditingChannel] = useState<{
-    isOpen: boolean;
-    channelKey: string;
-    channelInfo: ChannelInfo | null;
-  }>({ isOpen: false, channelKey: "", channelInfo: null });
-  const [editingMcpServer, setEditingMcpServer] = useState<{
-    isOpen: boolean;
-    serverId: string;
-    server: McpServer | null;
-    mode: "add" | "edit";
-  }>({ isOpen: false, serverId: "", server: null, mode: "add" });
-  const toast = useToast();
-
-  // 防抖自动保存功能
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // 防抖保存函数（500ms）
-  const debouncedAutoSave = useCallback((updatedConfig: Config) => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    
-    saveTimeoutRef.current = setTimeout(async () => {
-      try {
-        const configToSave = cleanConfigForSave(updatedConfig);
-        await configApi.save(configToSave);
-        setOriginalConfig(updatedConfig);
-        setCode(JSON.stringify(updatedConfig, null, 2));
-        console.log('[AutoSave] Configuration saved successfully');
-      } catch (error) {
-        console.error('[AutoSave] Failed to save:', error);
-        // 不显示错误提示，避免频繁打扰用户
-      }
-    }, 500);
-  }, []);
-
-  // 代码编辑器模式状态
   const [viewMode, setViewMode] = useState<"visual" | "code">("visual");
   const [originalConfig, setOriginalConfig] = useState<Config>({});
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState<string | null>(null);
   const [savingCode, setSavingCode] = useState(false);
+  
+  // 展开状态
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem("configEditorExpandedSections");
+    if (saved) {
+      try {
+        return new Set(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to load expanded sections:", e);
+      }
+    }
+    return new Set(["providers", "channels", "mcp", "tools"]);
+  });
+  
+  // 选中的 Provider
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(() => {
+    return localStorage.getItem("selectedProviderId");
+  });
+  
+  // OAuth 状态
+  const [oauthTokenStatuses, setOauthTokenStatuses] = useState<Record<string, boolean | "expired">>({});
+  
+  // MCP Servers 配置
+  const [mcpServersConfig, setMcpServersConfig] = useState<Record<string, McpServerWithState>>({});
+  
+  // 对话框状态
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyVersions, setHistoryVersions] = useState<ConfigHistoryVersion[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templates, setTemplates] = useState<ConfigTemplate[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+  const [templateDialog, setTemplateDialog] = useState<TemplateDialogState>({ isOpen: false, mode: "save", name: "", description: "" });
+  const [editingProvider, setEditingProvider] = useState<EditingProvider>({ isOpen: false, providerId: "", providerInfo: null, activeTab: "api" });
+  const [editingChannel, setEditingChannel] = useState<EditingChannel>({ isOpen: false, channelKey: "", channelInfo: null });
+  const [editingMcpServer, setEditingMcpServer] = useState<EditingMcpServer>({ isOpen: false, serverId: "", server: null, mode: "add" });
 
+  // Hooks
+  const { getProviderAgentConfig, updateProviderAgentConfig, buildAgentDefaults } = useProviderAgentConfig();
+  const { loadMcpServersConfig, saveMcpServersConfig, mergeMcpConfig } = useMcpServersConfig();
+
+  // 自动保存
+  const handleSave = useCallback(async (updatedConfig: Config) => {
+    try {
+      const configToSave = cleanConfigForSave(updatedConfig, mcpServersConfig);
+      await configApi.save(configToSave);
+      setOriginalConfig(updatedConfig);
+      setCode(JSON.stringify(updatedConfig, null, 2));
+      console.log("[AutoSave] Configuration saved successfully");
+    } catch (error) {
+      console.error("[AutoSave] Failed to save:", error);
+    }
+  }, [mcpServersConfig]);
+
+  const debouncedAutoSave = useAutoSave({ onSave: handleSave, delay: 500 });
+
+  // 加载配置
   useEffect(() => {
     loadConfig();
     checkAllOAuthStatuses();
-    
-    // 清理函数：组件卸载时清除定时器
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
   }, []);
 
-  // 检查所有 OAuth provider 的 token 状态
-  const checkAllOAuthStatuses = async () => {
-    const oauthProviders = AVAILABLE_PROVIDERS.filter(p => isOAuthProvider(p.id));
-    const statuses: Record<string, boolean | "expired"> = {};
-    await Promise.all(
-      oauthProviders.map(async (provider) => {
-        if (!provider.loginCommand) return;
-        try {
-          const result = await processApi.checkOAuthToken(provider.loginCommand);
-          statuses[provider.id] = result.has_token
-            ? (result.is_expired ? "expired" : true)
-            : false;
-        } catch {
-          statuses[provider.id] = false;
-        }
-      })
-    );
-    setOauthTokenStatuses(statuses);
-  };
-
-  // 监听展开状态变化并保存到 localStorage
+  // 保存展开状态
   useEffect(() => {
     localStorage.setItem("configEditorExpandedSections", JSON.stringify([...expandedSections]));
   }, [expandedSections]);
 
-  // 监听选中的 Provider 并保存到 localStorage
+  // 保存选中的 Provider
   useEffect(() => {
     if (selectedProviderId) {
       localStorage.setItem("selectedProviderId", selectedProviderId);
@@ -220,6 +113,20 @@ export default function ConfigEditor() {
       localStorage.removeItem("selectedProviderId");
     }
   }, [selectedProviderId]);
+
+  // 加载历史时
+  useEffect(() => {
+    if (showHistory) {
+      loadHistory();
+    }
+  }, [showHistory]);
+
+  // 加载模板时
+  useEffect(() => {
+    if (showTemplates) {
+      loadTemplates();
+    }
+  }, [showTemplates]);
 
   async function loadConfig() {
     setLoading(true);
@@ -231,34 +138,15 @@ export default function ConfigEditor() {
       } else {
         const loadedConfig = result as Config;
         setConfig(loadedConfig);
-        // 同步更新代码编辑器状态
         setOriginalConfig(loadedConfig);
         setCode(JSON.stringify(loadedConfig, null, 2));
 
-        // 初始化 MCP 服务器配置：合并 config.json 和 localStorage
+        // 合并 MCP 配置
         const savedMcpConfig = loadMcpServersConfig();
         const configMcpServers = loadedConfig.tools?.mcpServers || {};
-
-        // 合并：config.json 中的服务器为启用状态，localStorage 中保存的禁用状态
-        const mergedMcpConfig: Record<string, McpServerWithState> = {};
-
-        // 先添加 localStorage 中保存的服务器（确保有 disabled 字段）
-        for (const [serverId, server] of Object.entries(savedMcpConfig)) {
-          mergedMcpConfig[serverId] = {
-            ...server,
-            disabled: server.disabled === true // 明确设置为 true 或 false
-          };
-        }
-
-        // 再添加 config.json 中的服务器（标记为启用）
-        for (const [serverId, server] of Object.entries(configMcpServers)) {
-          // 只有当 localStorage 中没有这个服务器时才添加（说明是启用的）
-          if (!mergedMcpConfig[serverId]) {
-            mergedMcpConfig[serverId] = { ...server, disabled: false };
-          }
-        }
-        setMcpServersConfig(mergedMcpConfig);
-        }
+        const merged = mergeMcpConfig(savedMcpConfig, configMcpServers);
+        setMcpServersConfig(merged);
+      }
     } catch (error) {
       toast.showError(t("config.loadConfigFailed"));
     } finally {
@@ -266,362 +154,21 @@ export default function ConfigEditor() {
     }
   }
 
-  // 加载 MCP 服务器配置（从 localStorage）
-  function loadMcpServersConfig() {
-    try {
-      const saved = localStorage.getItem(MCP_SERVERS_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed as Record<string, McpServerWithState>;
-      }
-    } catch (error) {
-      console.error("Failed to load MCP servers config:", error);
-    }
-    return {};
-  }
-
-  // 保存 MCP 服务器配置（到 localStorage）
-  function saveMcpServersConfig(data: Record<string, McpServerWithState>) {
-    try {
-      localStorage.setItem(MCP_SERVERS_STORAGE_KEY, JSON.stringify(data));
-    } catch (error) {
-      console.error("Failed to save MCP servers config:", error);
-    }
-  }
-
-  // 代码编辑器相关函数
-  async function saveCodeConfig() {
-    setSavingCode(true);
-    try {
-      const parsed = JSON.parse(code);
-      setCodeError(null);
-
-      const validation = await configApi.validate(parsed);
-      if (!validation.valid && validation.errors && validation.errors.length > 0) {
-        toast.showError(`${t("config.validationFailed")}: ${validation.errors.join(", ")}`);
-        return;
-      }
-
-      await configApi.save(parsed);
-      setOriginalConfig(parsed);
-      setConfig(parsed as Config);
-
-      // 同步更新 MCP 服务器配置状态
-      const configMcpServers = (parsed as Config).tools?.mcpServers || {};
-      const updatedMcpConfig: Record<string, McpServerWithState> = {};
-
-      // 保留现有服务器的禁用状态
-      for (const [serverId, server] of Object.entries(mcpServersConfig)) {
-        if (configMcpServers[serverId]) {
-          // 服务器仍在配置中，保留禁用状态但更新其他配置
-          updatedMcpConfig[serverId] = {
-            ...configMcpServers[serverId],
-            disabled: server.disabled
-          };
+  async function checkAllOAuthStatuses() {
+    const oauthProviders = AVAILABLE_PROVIDERS.filter((p) => p.loginCommand);
+    const statuses: Record<string, boolean | "expired"> = {};
+    await Promise.all(
+      oauthProviders.map(async (provider) => {
+        if (!provider.loginCommand) return;
+        try {
+          const result = await processApi.checkOAuthToken(provider.loginCommand);
+          statuses[provider.id] = result.has_token ? (result.is_expired ? "expired" : true) : false;
+        } catch {
+          statuses[provider.id] = false;
         }
-        // 如果服务器不在新配置中，则不添加（已被删除）
-      }
-
-      // 添加新服务器（默认启用）
-      for (const [serverId, server] of Object.entries(configMcpServers)) {
-        if (!updatedMcpConfig[serverId]) {
-          updatedMcpConfig[serverId] = { ...server, disabled: false };
-        }
-      }
-
-      setMcpServersConfig(updatedMcpConfig);
-
-      // 更新选中的 provider（如果配置中指定了）
-      const agentDefaults = (parsed as Config).agents?.defaults;
-      if (agentDefaults?.provider && agentDefaults.provider !== "auto") {
-        setSelectedProviderId(agentDefaults.provider);
-      }
-
-      // 更新代码状态为保存后的内容
-      setCode(JSON.stringify(parsed, null, 2));
-      toast.showSuccess(t("config.saveSuccess"));
-    } catch (error) {
-      if (typeof error === "object" && error !== null && "message" in error) {
-        const jsonError = error as { message: string };
-        if (jsonError.message.includes("JSON")) {
-          setCodeError(`${t("config.jsonSyntaxError")}: ${jsonError.message}`);
-          toast.showError(t("config.jsonSyntaxError"));
-          return;
-        }
-      }
-      toast.showError(t("config.saveFailed"));
-    } finally {
-      setSavingCode(false);
-    }
-  }
-
-  function formatCode() {
-    try {
-      const parsed = JSON.parse(code);
-      const formatted = JSON.stringify(parsed, null, 2);
-      setCode(formatted);
-      setCodeError(null);
-      toast.showSuccess(t("config.codeFormatted"));
-    } catch (error) {
-      setCodeError(`${t("config.formatFailed")}: ${t("config.jsonSyntaxError")}`);
-      toast.showError(`${t("config.formatFailed")}: ${t("config.jsonSyntaxError")}`);
-    }
-  }
-
-  function handleCodeChange(newCode: string) {
-    setCode(newCode);
-    try {
-      JSON.parse(newCode);
-      setCodeError(null);
-    } catch (error) {
-      if (typeof error === "object" && error !== null && "message" in error) {
-        setCodeError(`${t("config.jsonSyntaxError")} ${(error as { message: string }).message}`);
-      } else {
-        setCodeError(t("config.jsonSyntaxError"));
-      }
-    }
-  }
-
-  // 从 localStorage 获取每个 Provider 独立的 Agent 配置
-  function getProviderAgentConfigs(): Record<string, ProviderAgentConfig> {
-    try {
-      const saved = localStorage.getItem(PROVIDER_AGENT_CONFIGS_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error("Failed to load provider agent configs:", e);
-    }
-    return {};
-  }
-
-  // 保存每个 Provider 独立的 Agent 配置到 localStorage
-  function saveProviderAgentConfigs(configs: Record<string, ProviderAgentConfig>) {
-    try {
-      localStorage.setItem(PROVIDER_AGENT_CONFIGS_KEY, JSON.stringify(configs));
-    } catch (e) {
-      console.error("Failed to save provider agent configs:", e);
-    }
-  }
-
-  // 获取指定 Provider 的 Agent 配置（从独立存储中获取）
-  function getProviderAgentConfig(providerId: string): ProviderAgentConfig {
-    const configs = getProviderAgentConfigs();
-    const providerConfig = configs[providerId];
-
-    if (providerConfig) {
-      return providerConfig;
-    }
-
-    // 如果该 Provider 没有独立配置，返回推荐的默认配置
-    const providerInfo = AVAILABLE_PROVIDERS.find(p => p.id === providerId);
-    return {
-      model: providerInfo?.defaultModel || "",
-      max_tokens: 8192,
-      max_tool_iterations: 20,
-      memory_window: 50,
-      temperature: 0.7,
-      workspace: "~/.nanobot/workspace",
-    };
-  }
-
-  // 更新 Provider 的独立 Agent 配置（保存到 localStorage）
-  function updateProviderAgentConfig(providerId: string, field: keyof ProviderAgentConfig, value: any) {
-    const configs = getProviderAgentConfigs();
-    const currentConfig = configs[providerId] || {};
-
-    // 更新指定字段
-    configs[providerId] = {
-      ...currentConfig,
-      [field]: value,
-    };
-
-    // 保存到 localStorage
-    saveProviderAgentConfigs(configs);
-
-    // 强制重新渲染以更新 UI
-    setConfig({ ...config });
-  }
-
-  // 应用 Provider 的 Agent 配置到 config.agents.defaults
-  async function applyProviderAgentConfig(providerId: string, _updateDefaultProvider: boolean = false) {
-    const providerInfo = AVAILABLE_PROVIDERS.find(p => p.id === providerId);
-
-    // 从 localStorage 获取该 Provider 的独立配置
-    const providerAgentConfig = getProviderAgentConfig(providerId);
-
-    // 将 snake_case 转换为 camelCase 并构建 defaults
-    const mergedConfig = {
-      provider: providerId,
-      model: providerAgentConfig.model || providerInfo?.defaultModel || "",
-      maxTokens: providerAgentConfig.max_tokens || 8192,
-      maxToolIterations: providerAgentConfig.max_tool_iterations ?? 20,
-      memoryWindow: providerAgentConfig.memory_window ?? 50,
-      temperature: providerAgentConfig.temperature ?? 0.7,
-      workspace: providerAgentConfig.workspace || "~/.nanobot/workspace",
-    };
-
-    const updatedConfig = {
-      ...config,
-      agents: {
-        ...config.agents,
-        defaults: mergedConfig,
-      },
-    };
-
-    setConfig(updatedConfig);
-    setSelectedProviderId(providerId);
-
-    const providerName = providerInfo?.id || providerId;
-    toast.showSuccess(t("config.applyProviderConfig", { name: providerName }));
-
-    // 自动保存（防抖）
-    debouncedAutoSave(updatedConfig);
-  }
-
-  // 有效的 channel 名称列表（根据 nanobot 官方文档）
-  const VALID_CHANNELS = [
-    'telegram', 'discord', 'whatsapp', 'mochat', 'feishu',
-    'dingtalk', 'slack', 'qq', 'matrix', 'email'
-  ];
-
-  // channels 顶层配置字段（不在具体 channel 内部）
-  const CHANNEL_TOP_LEVEL_KEYS = ['sendProgress', 'sendToolHints'];
-
-  // 清理配置，移除仅用于 UI 的辅助字段，确保符合 nanobot 官方格式
-  function cleanConfigForSave(config: Config): any {
-    const cleaned: any = {
-      ...config,
-    };
-
-    // 清理 providers - 移除 UI 辅助字段、null 值
-    if (config.providers) {
-      cleaned.providers = {};
-      for (const [key, provider] of Object.entries(config.providers)) {
-        const { default_model, models, name, ...rest } = provider;
-
-        // 移除 null 值的字段
-        const cleanProvider: Record<string, any> = {};
-        for (const [k, v] of Object.entries(rest)) {
-          if (v !== null && v !== undefined) {
-            cleanProvider[k] = v;
-          }
-        }
-
-        // 获取该提供商的默认 apiBase
-        const providerInfo = AVAILABLE_PROVIDERS.find(p => p.id === key);
-        const defaultApiBase = providerInfo?.apiBase;
-
-        // 如果配置了 apiKey 但没有配置 apiBase，自动填充默认值并保存
-        if (cleanProvider.apiKey && !cleanProvider.apiBase && defaultApiBase) {
-          cleanProvider.apiBase = defaultApiBase;
-        }
-
-        // 只保存有实际配置的 provider（至少有 apiKey）
-        if (cleanProvider.apiKey) {
-          cleaned.providers[key] = cleanProvider;
-        }
-      }
-    }
-
-    // 清理 channels - 确保 sendProgress/sendToolHints 在顶层
-    if (config.channels) {
-      cleaned.channels = {};
-
-      // 处理顶层配置字段
-      for (const topLevelKey of CHANNEL_TOP_LEVEL_KEYS) {
-        if (config.channels[topLevelKey] !== undefined) {
-          cleaned.channels[topLevelKey] = config.channels[topLevelKey];
-        }
-      }
-
-      // 处理各个 channel 配置
-      for (const [key, channel] of Object.entries(config.channels)) {
-        // 跳过顶层配置字段
-        if (CHANNEL_TOP_LEVEL_KEYS.includes(key)) {
-          continue;
-        }
-
-        // 跳过非 channel 的键
-        if (!VALID_CHANNELS.includes(key)) {
-          console.warn(`[cleanConfigForSave] Skipping invalid channel key: ${key}`);
-          continue;
-        }
-
-        const cleanedChannel: Record<string, any> = {};
-
-        // 移除 null 值的字段
-        for (const [k, v] of Object.entries(channel as Record<string, any>)) {
-          if (v !== null && v !== undefined) {
-            cleanedChannel[k] = v;
-          }
-        }
-
-        // 将 allowFrom 字符串转换为列表
-        if (cleanedChannel.allowFrom !== undefined) {
-          if (typeof cleanedChannel.allowFrom === 'string') {
-            // 如果是空字符串或只有空白字符，设置为空数组（允许所有人）
-            if (cleanedChannel.allowFrom.trim() === '') {
-              cleanedChannel.allowFrom = [];
-            } else {
-              // 否则按逗号分割成数组，并去除空白字符
-              cleanedChannel.allowFrom = cleanedChannel.allowFrom
-                .split(',')
-                .map((s: string) => s.trim())
-                .filter((s: string) => s.length > 0);
-            }
-          } else if (Array.isArray(cleanedChannel.allowFrom)) {
-            // 如果是数组，过滤掉空字符串
-            cleanedChannel.allowFrom = cleanedChannel.allowFrom.filter((s: string) => s.trim().length > 0);
-          }
-        }
-
-        cleaned.channels[key] = cleanedChannel;
-      }
-    }
-
-    // 清理 tools.mcpServers - 只保存启用的服务器
-    const enabledServers: Record<string, any> = {};
-    for (const [serverId, server] of Object.entries(mcpServersConfig)) {
-      // 只保存启用的服务器（disabled 不为 true）
-      if (!server.disabled) {
-        // 移除 UI 辅助字段后保存（这些字段不是官方配置）
-        // - disabled: UI 状态，用于启用/禁用服务器
-        // - type: 非官方字段，nanobot 通过 url 是否存在自动判断传输模式
-        const { disabled, type, ...serverWithoutUiFields } = server as any;
-
-        // 移除 null 值的字段
-        const cleanServer: Record<string, any> = {};
-        for (const [k, v] of Object.entries(serverWithoutUiFields)) {
-          if (v !== null && v !== undefined) {
-            cleanServer[k] = v;
-          }
-        }
-
-        if (Object.keys(cleanServer).length > 0) {
-          enabledServers[serverId] = cleanServer;
-        }
-      }
-    }
-
-    // 设置 tools 配置
-    cleaned.tools = {
-      ...config.tools,
-      mcpServers: enabledServers,
-    };
-
-    // 清理 tools 中的 null 值
-    if (cleaned.tools) {
-      const cleanTools: Record<string, any> = {};
-      for (const [k, v] of Object.entries(cleaned.tools)) {
-        if (v !== null && v !== undefined) {
-          cleanTools[k] = v;
-        }
-      }
-      cleaned.tools = cleanTools;
-    }
-
-    return cleaned;
+      })
+    );
+    setOauthTokenStatuses(statuses);
   }
 
   function toggleSection(section: string) {
@@ -634,7 +181,7 @@ export default function ConfigEditor() {
     setExpandedSections(newExpanded);
   }
 
-  async function updateProvider(name: string, field: keyof Provider, value: any) {
+  async function updateProvider(name: string, field: keyof any, value: any) {
     const currentProvider = config.providers?.[name] || { name };
     const updatedConfig = {
       ...config,
@@ -647,8 +194,6 @@ export default function ConfigEditor() {
       },
     };
     setConfig(updatedConfig);
-
-    // 自动保存（防抖）
     debouncedAutoSave(updatedConfig);
   }
 
@@ -657,8 +202,6 @@ export default function ConfigEditor() {
     delete newProviders[name];
     const updatedConfig = { ...config, providers: newProviders };
     setConfig(updatedConfig);
-
-    // 自动保存（防抖）
     debouncedAutoSave(updatedConfig);
   }
 
@@ -674,8 +217,6 @@ export default function ConfigEditor() {
       },
     };
     setConfig(updatedConfig);
-
-    // 自动保存（防抖）
     debouncedAutoSave(updatedConfig);
   }
 
@@ -692,12 +233,9 @@ export default function ConfigEditor() {
       },
     };
     setConfig(updatedConfig);
-
-    // 自动保存（防抖）
     debouncedAutoSave(updatedConfig);
   }
 
-  // 更新 channels 顶层配置（如 sendProgress, sendToolHints）
   async function updateChannelsTopLevel(field: string, value: any) {
     const updatedConfig = {
       ...config,
@@ -707,29 +245,9 @@ export default function ConfigEditor() {
       },
     };
     setConfig(updatedConfig);
-
-    // 自动保存（防抖）
     debouncedAutoSave(updatedConfig);
   }
 
-  async function updateToolsConfig(field: string, value: any) {
-    const updatedConfig = {
-      ...config,
-      tools: {
-        ...config.tools,
-        [field]: value,
-      },
-    };
-    setConfig(updatedConfig);
-
-    // 自动保存（防抖）
-    debouncedAutoSave(updatedConfig);
-    
-    // 显示成功提示
-    toast.showSuccess(value ? t("config.restrictEnabled") : t("config.restrictDisabled"));
-  }
-
-  // 更新 tools.exec 配置
   async function updateToolsExecConfig(field: string, value: any) {
     const updatedConfig = {
       ...config,
@@ -742,12 +260,9 @@ export default function ConfigEditor() {
       },
     };
     setConfig(updatedConfig);
-
-    // 自动保存（防抖）
     debouncedAutoSave(updatedConfig);
   }
 
-  // 更新 tools.web.search 配置
   async function updateToolsWebSearchConfig(field: string, value: any) {
     const updatedConfig = {
       ...config,
@@ -763,14 +278,23 @@ export default function ConfigEditor() {
       },
     };
     setConfig(updatedConfig);
-
-    // 自动保存（防抖）
     debouncedAutoSave(updatedConfig);
   }
 
-  // MCP Server 相关函数
-  async function saveMcpServer(serverId: string, server: McpServer) {
-    // 更新 localStorage 中的配置（新添加的服务器默认启用）
+  async function updateToolsConfig(field: string, value: any) {
+    const updatedConfig = {
+      ...config,
+      tools: {
+        ...config.tools,
+        [field]: value,
+      },
+    };
+    setConfig(updatedConfig);
+    debouncedAutoSave(updatedConfig);
+    toast.showSuccess(value ? t("config.restrictEnabled") : t("config.restrictDisabled"));
+  }
+
+  async function saveMcpServer(serverId: string, server: McpServerWithState) {
     const serverWithState: McpServerWithState = { ...server, disabled: false };
     const updatedMcpConfig = {
       ...mcpServersConfig,
@@ -779,7 +303,6 @@ export default function ConfigEditor() {
     setMcpServersConfig(updatedMcpConfig);
     saveMcpServersConfig(updatedMcpConfig);
 
-    // 更新 config（用于保存到 config.json）
     const updatedConfig = {
       ...config,
       tools: {
@@ -791,14 +314,10 @@ export default function ConfigEditor() {
       },
     };
     setConfig(updatedConfig);
-
-    // 自动保存（防抖）
     debouncedAutoSave(updatedConfig);
-    
     toast.showSuccess(t("mcp.serverSaved"));
   }
 
-  // 切换 MCP Server 启用/禁用状态
   async function toggleMcpServer(serverId: string) {
     const currentServer = mcpServersConfig[serverId];
     if (!currentServer) return;
@@ -806,7 +325,6 @@ export default function ConfigEditor() {
     const newDisabled = !currentServer.disabled;
     const updatedServer: McpServerWithState = { ...currentServer, disabled: newDisabled };
 
-    // 更新 localStorage
     const updatedMcpConfig = {
       ...mcpServersConfig,
       [serverId]: updatedServer,
@@ -814,7 +332,6 @@ export default function ConfigEditor() {
     setMcpServersConfig(updatedMcpConfig);
     saveMcpServersConfig(updatedMcpConfig);
 
-    // 更新 config
     const updatedConfig = {
       ...config,
       tools: {
@@ -826,21 +343,16 @@ export default function ConfigEditor() {
       },
     };
     setConfig(updatedConfig);
-
-    // 自动保存（防抖）
     debouncedAutoSave(updatedConfig);
-    
     toast.showSuccess(newDisabled ? t("mcp.serverDisabled") : t("mcp.serverEnabled"));
   }
 
   async function deleteMcpServer(serverId: string) {
-    // 从 localStorage 删除
     const updatedMcpConfig = { ...mcpServersConfig };
     delete updatedMcpConfig[serverId];
     setMcpServersConfig(updatedMcpConfig);
     saveMcpServersConfig(updatedMcpConfig);
 
-    // 从 config 删除
     const currentServers = { ...config.tools?.mcpServers };
     delete currentServers[serverId];
 
@@ -852,10 +364,7 @@ export default function ConfigEditor() {
       },
     };
     setConfig(updatedConfig);
-
-    // 自动保存（防抖）
     debouncedAutoSave(updatedConfig);
-    
     toast.showSuccess(t("mcp.serverDeleted"));
   }
 
@@ -901,20 +410,6 @@ export default function ConfigEditor() {
     }
   }
 
-  // 打开{t("config.history")}面板时加载历史
-  useEffect(() => {
-    if (showHistory) {
-      loadHistory();
-    }
-  }, [showHistory]);
-
-  // 打开模板面板时加载模板
-  useEffect(() => {
-    if (showTemplates) {
-      loadTemplates();
-    }
-  }, [showTemplates]);
-
   function loadTemplates() {
     try {
       const stored = localStorage.getItem(TEMPLATES_STORAGE_KEY);
@@ -935,24 +430,12 @@ export default function ConfigEditor() {
     }
   }
 
-  function openSaveTemplateDialog() {
-    setTemplateDialog({
-      isOpen: true,
-      mode: "save",
-      name: "",
-      description: "",
-    });
-  }
-
   function applyTemplate(template: ConfigTemplate) {
     setConfig(template.config);
-    // 同步更新代码编辑器状态
     setOriginalConfig(template.config);
     setCode(JSON.stringify(template.config, null, 2));
     toast.showSuccess(t("config.templateLoaded", { name: template.name }));
     setShowTemplates(false);
-    
-    // 自动保存（防抖）
     debouncedAutoSave(template.config);
   }
 
@@ -992,6 +475,109 @@ export default function ConfigEditor() {
     setTemplateDialog({ isOpen: false, mode: "save", name: "", description: "" });
   }
 
+  async function saveCodeConfig() {
+    setSavingCode(true);
+    try {
+      const parsed = JSON.parse(code);
+      setCodeError(null);
+
+      const validation = await configApi.validate(parsed);
+      if (!validation.valid && validation.errors && validation.errors.length > 0) {
+        toast.showError(`${t("config.validationFailed")}: ${validation.errors.join(", ")}`);
+        return;
+      }
+
+      await configApi.save(parsed);
+      setOriginalConfig(parsed);
+      setConfig(parsed as Config);
+
+      const configMcpServers = (parsed as Config).tools?.mcpServers || {};
+      const updatedMcpConfig: Record<string, McpServerWithState> = {};
+
+      for (const [serverId, server] of Object.entries(mcpServersConfig)) {
+        if (configMcpServers[serverId]) {
+          updatedMcpConfig[serverId] = {
+            ...configMcpServers[serverId],
+            disabled: server.disabled,
+          };
+        }
+      }
+
+      for (const [serverId, server] of Object.entries(configMcpServers)) {
+        if (!updatedMcpConfig[serverId]) {
+          updatedMcpConfig[serverId] = { ...server, disabled: false };
+        }
+      }
+
+      setMcpServersConfig(updatedMcpConfig);
+
+      const agentDefaults = (parsed as Config).agents?.defaults;
+      if (agentDefaults?.provider && agentDefaults.provider !== "auto") {
+        setSelectedProviderId(agentDefaults.provider);
+      }
+
+      setCode(JSON.stringify(parsed, null, 2));
+      toast.showSuccess(t("config.saveSuccess"));
+    } catch (error) {
+      if (typeof error === "object" && error !== null && "message" in error) {
+        const jsonError = error as { message: string };
+        if (jsonError.message.includes("JSON")) {
+          setCodeError(`${t("config.jsonSyntaxError")}: ${jsonError.message}`);
+          toast.showError(t("config.jsonSyntaxError"));
+          return;
+        }
+      }
+      toast.showError(t("config.saveFailed"));
+    } finally {
+      setSavingCode(false);
+    }
+  }
+
+  function formatCode() {
+    try {
+      const parsed = JSON.parse(code);
+      const formatted = JSON.stringify(parsed, null, 2);
+      setCode(formatted);
+      setCodeError(null);
+      toast.showSuccess(t("config.codeFormatted"));
+    } catch (error) {
+      setCodeError(`${t("config.formatFailed")}: ${t("config.jsonSyntaxError")}`);
+      toast.showError(`${t("config.formatFailed")}: ${t("config.jsonSyntaxError")}`);
+    }
+  }
+
+  function handleCodeChange(newCode: string) {
+    setCode(newCode);
+    try {
+      JSON.parse(newCode);
+      setCodeError(null);
+    } catch (error) {
+      if (typeof error === "object" && error !== null && "message" in error) {
+        setCodeError(`${t("config.jsonSyntaxError")} ${(error as { message: string }).message}`);
+      } else {
+        setCodeError(t("config.jsonSyntaxError"));
+      }
+    }
+  }
+
+  async function applyProviderAgentConfig(providerId: string) {
+    const providerAgentCfg = getProviderAgentConfig(providerId);
+    const mergedConfig = buildAgentDefaults(providerId, providerAgentCfg);
+
+    const updatedConfig = {
+      ...config,
+      agents: {
+        ...config.agents,
+        defaults: mergedConfig,
+      },
+    };
+
+    setConfig(updatedConfig);
+    setSelectedProviderId(providerId);
+    toast.showSuccess(t("config.applyProviderConfig", { name: providerId }));
+    debouncedAutoSave(updatedConfig);
+  }
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-white dark:bg-dark-bg-base transition-colors duration-200">
@@ -1002,29 +588,26 @@ export default function ConfigEditor() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-dark-bg-base transition-colors duration-200">
-      {/* 页面头部 */}
+      {/* 头部 */}
       <div className="bg-white dark:bg-dark-bg-card border-b border-gray-200 dark:border-dark-border-subtle px-6 py-4 flex-shrink-0 transition-colors duration-200">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold text-gray-900 dark:text-dark-text-primary">{t("config.title")}</h1>
             <div className="flex gap-2">
               <button
-                onClick={async () => {
+                onClick={() => {
                   if (viewMode === "visual") {
-                    // 切换到代码模式，加载当前配置
                     setOriginalConfig(config);
                     setCode(JSON.stringify(config, null, 2));
                     setCodeError(null);
                     setViewMode("code");
                   } else {
-                    // 切换回可视模式前，检查是否有未保存的修改
                     if (code !== JSON.stringify(originalConfig, null, 2)) {
                       setConfirmDialog({
                         isOpen: true,
                         title: t("config.unsavedChanges"),
                         message: t("config.unsavedChangesMsg"),
-                        onConfirm: async () => {
-                          // 用户选择放弃修改，直接切换
+                        onConfirm: () => {
                           setViewMode("visual");
                           setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => {} });
                         },
@@ -1051,7 +634,6 @@ export default function ConfigEditor() {
                     message: t("config.initConfigConfirm"),
                     onConfirm: async () => {
                       try {
-                        // 初始化配置并直接保存到文件
                         await configApi.save(DEFAULT_CONFIG);
                         const initConfig = DEFAULT_CONFIG as unknown as Config;
                         setConfig(initConfig);
@@ -1088,759 +670,145 @@ export default function ConfigEditor() {
         </div>
       </div>
 
-      {/* 主内容区域 - 带滚动条 */}
+      {/* 主内容 */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin bg-white dark:bg-dark-bg-base">
         {viewMode === "visual" ? (
           <div className="p-8">
             <div className="max-w-6xl mx-auto space-y-6">
+              {/* 历史面板 */}
+              <HistoryPanel
+                isOpen={showHistory}
+                loading={loadingHistory}
+                versions={historyVersions}
+                onClose={() => setShowHistory(false)}
+                onRestore={restoreVersion}
+                onDelete={deleteVersion}
+              />
 
-            {/* {t("config.history")}模态框 */}
-        <HistoryPanel
-          isOpen={showHistory}
-          loading={loadingHistory}
-          versions={historyVersions}
-          onClose={() => setShowHistory(false)}
-          onRestore={restoreVersion}
-          onDelete={deleteVersion}
-        />
-
-        {/* 模板面板 */}
-        {showTemplates && (
-          <div className="bg-white dark:bg-dark-bg-card rounded-lg border border-gray-200 dark:border-dark-border-subtle overflow-hidden transition-colors duration-200">
-            <div className="p-5 border-b border-gray-200 dark:border-dark-border-subtle flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-lg">
-                  <Copy className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                </div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary">
-                  {t("config.configTemplates")}
-                </h2>
-              </div>
-              <button
-                onClick={openSaveTemplateDialog}
-                className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                {t("config.saveAsTemplate")}
-              </button>
-            </div>
-
-            <div className="p-5">
-              {templates.length === 0 ? (
-                <EmptyState
-                  icon={FolderOpen}
-                  title={t("config.noTemplates")}
-                  description={t("config.noTemplatesDesc")}
-                />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {templates.map((template) => (
-                    <div
-                      key={template.id}
-                      className="group p-4 rounded-lg bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle hover:border-purple-200 dark:hover:border-purple-500/50 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 dark:text-dark-text-primary text-sm mb-1">
-                            {template.name}
-                          </h4>
-                          {template.description && (
-                            <p className="text-xs text-gray-500 dark:text-dark-text-muted line-clamp-2">
-                              {template.description}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                          <button
-                            onClick={() => applyTemplate(template)}
-                            className="p-1.5 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
-                            title={t("config.applyTemplate")}
-                          >
-                            <FolderOpen className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => deleteTemplate(template)}
-                            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                            title={t("config.delete")}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+              {/* 模板面板 */}
+              {showTemplates && (
+                <div className="bg-white dark:bg-dark-bg-card rounded-lg border border-gray-200 dark:border-dark-border-subtle overflow-hidden transition-colors duration-200">
+                  <div className="p-5 border-b border-gray-200 dark:border-dark-border-subtle flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-lg">
+                        <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                       </div>
-                      <div className="text-xs text-gray-400 dark:text-dark-text-muted">
-                        {new Date(template.createdAt).toLocaleString(i18n.language === "en" ? "en-US" : "zh-CN")}
-                      </div>
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary">
+                        {t("config.configTemplates")}
+                      </h2>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+                    <button
+                      onClick={() => setTemplateDialog({ isOpen: true, mode: "save", name: "", description: "" })}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+                    >
+                      <Plus className="w-4 h-4" />
+                      {t("config.saveAsTemplate")}
+                    </button>
+                  </div>
 
-        {/* Providers 配置 */}
-        <div className="bg-white dark:bg-dark-bg-card rounded-lg border border-gray-200 dark:border-dark-border-subtle overflow-hidden transition-colors duration-200">
-          <button
-            onClick={() => toggleSection("providers")}
-            className="w-full p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-dark-bg-hover transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                <Bot className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary">
-                {t("config.llmProviders")}
-              </h2>
-            </div>
-            {expandedSections.has("providers") ? (
-              <ChevronUp className="w-5 h-5 text-gray-400 dark:text-dark-text-muted" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-gray-400 dark:text-dark-text-muted" />
-            )}
-          </button>
-
-          {expandedSections.has("providers") && (
-            <div className="p-5 pt-0 space-y-4">
-              {/* 可用的 Provider 列表 */}
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600 dark:text-dark-text-secondary mb-3">{t("config.selectProvider")}</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {AVAILABLE_PROVIDERS.map((provider) => {
-                    const isConfigured = isProviderConfigured(config, provider.id);
-                    const isCurrentProvider = selectedProviderId === provider.id;
-                    const isOAuth = isOAuthProvider(provider.id);
-                    const oauthStatus = isOAuth ? oauthTokenStatuses[provider.id] : undefined;
-                    const isOAuthLoggedIn = oauthStatus === true;
-                    const isOAuthExpired = oauthStatus === "expired";
-                    // 获取该 Provider 的独立配置
-                    const providerAgentCfg = getProviderAgentConfig(provider.id);
-
-                    return (
-                      <div
-                        key={provider.id}
-                        className={`group rounded-lg border transition-all hover:shadow-md ${
-                          isCurrentProvider
-                            ? "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-500/50 ring-2 ring-blue-200 dark:ring-blue-500/30"
-                            : isOAuthLoggedIn
-                            ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-500/50"
-                            : isOAuthExpired
-                            ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-500/50"
-                            : isConfigured && !isOAuth
-                            ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-500/50"
-                            : "bg-white dark:bg-dark-bg-card border-gray-200 dark:border-dark-border-subtle hover:border-gray-300 dark:hover:border-dark-border-default"
-                        }`}
-                      >
-                        <div className="w-full p-4 text-left">
-                          <div className="flex items-start justify-between">
-                            <div
-                              className="flex items-center gap-2 flex-1 cursor-pointer"
-                              onClick={() => {
-                                // 应用该提供商的 Agent 配置
-                                applyProviderAgentConfig(provider.id);
-                              }}
-                            >
-                              <div className={`p-2 rounded-lg ${provider.colorClass.split(' text-')[0]}`}>
-                                <ProviderIcon name={provider.icon} className={`w-5 h-5 ${'text-' + provider.colorClass.split(' text-')[1]}`} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h3 className="font-semibold text-gray-900 dark:text-dark-text-primary text-sm">
-                                    {t(provider.nameKey)}
-                                  </h3>
-                                  {isCurrentProvider && (
-                                    <span className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full font-medium">
-                                      {t("config.currentUse")}
-                                    </span>
-                                  )}
-                                  {!isCurrentProvider && isOAuthLoggedIn && (
-                                    <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full">
-                                      {t("config.oauthConfigured")}
-                                    </span>
-                                  )}
-                                  {!isCurrentProvider && isOAuthExpired && (
-                                    <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs rounded-full">
-                                      {t("config.tokenExpiredShort")}
-                                    </span>
-                                  )}
-                                  {!isCurrentProvider && !isOAuthLoggedIn && !isOAuthExpired && isConfigured && !isOAuth && (
-                                    <span className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs rounded-full">
-                                      {t("config.configured")}
-                                    </span>
-                                  )}
-                                  {!isCurrentProvider && !isOAuthLoggedIn && !isOAuthExpired && !isConfigured && (
-                                    <span className="px-2 py-0.5 bg-gray-100 dark:bg-dark-bg-hover text-gray-600 dark:text-dark-text-muted text-xs rounded-full">
-                                      {isOAuth ? t("config.notLoggedIn") : t("config.notConfigured")}
-                                    </span>
-                                  )}
-                                </div>
-                                {/* 显示配置的模型 */}
-                                {providerAgentCfg.model && (
-                                  <p className="text-xs text-gray-500 dark:text-dark-text-muted mt-1 truncate font-mono">
-                                    {providerAgentCfg.model}
+                  <div className="p-5">
+                    {templates.length === 0 ? (
+                      <EmptyState icon={FolderOpen} title={t("config.noTemplates")} description={t("config.noTemplatesDesc")} />
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {templates.map((template) => (
+                          <div
+                            key={template.id}
+                            className="group p-4 rounded-lg bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle hover:border-purple-200 dark:hover:border-purple-500/50 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-900 dark:text-dark-text-primary text-sm mb-1">
+                                  {template.name}
+                                </h4>
+                                {template.description && (
+                                  <p className="text-xs text-gray-500 dark:text-dark-text-muted line-clamp-2">
+                                    {template.description}
                                   </p>
                                 )}
                               </div>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                <button
+                                  onClick={() => applyTemplate(template)}
+                                  className="p-1.5 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
+                                  title={t("config.applyTemplate")}
+                                >
+                                  <FolderOpen className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => deleteTemplate(template)}
+                                  className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                                  title={t("config.delete")}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingProvider({
-                                  isOpen: true,
-                                  providerId: provider.id,
-                                  providerInfo: provider,
-                                  activeTab: "api",
-                                });
-                              }}
-                              className="p-2 bg-white dark:bg-dark-bg-card rounded-lg border border-gray-200 dark:border-dark-border-subtle group-hover:border-blue-200 dark:group-hover:border-blue-500/50 transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30"
-                              title={`${t("config.apiConfig")} & ${t("config.agentConfig")}`}
-                            >
-                              <Settings className="w-5 h-5 text-gray-400 dark:text-dark-text-muted group-hover:text-blue-600 dark:group-hover:text-blue-400" />
-                            </button>
+                            <div className="text-xs text-gray-400 dark:text-dark-text-muted">
+                              {new Date(template.createdAt).toLocaleString(i18n.language === "en" ? "en-US" : "zh-CN")}
+                            </div>
                           </div>
-                        </div>
+                        ))}
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
                 </div>
-              </div>
-
-              {Object.keys(config.providers || {}).length === 0 && (
-                <EmptyState
-                  icon={Bot}
-                  title={t("config.noProvidersConfigured")}
-                  description={t("config.noProvidersDesc")}
-                />
               )}
+
+              {/* 各个配置区域 */}
+              <ProviderSection
+                config={config}
+                expanded={expandedSections.has("providers")}
+                selectedProviderId={selectedProviderId}
+                oauthTokenStatuses={oauthTokenStatuses}
+                onToggle={() => toggleSection("providers")}
+                onEditProvider={setEditingProvider}
+                onApplyProviderConfig={applyProviderAgentConfig}
+                getProviderAgentConfig={getProviderAgentConfig}
+              />
+
+              <ChannelSection
+                config={config}
+                expanded={expandedSections.has("channels")}
+                onToggle={() => toggleSection("channels")}
+                onEditChannel={setEditingChannel}
+                onUpdateChannel={updateChannel}
+                onUpdateChannelsTopLevel={updateChannelsTopLevel}
+              />
+
+              <McpServerSection
+                mcpServersConfig={mcpServersConfig}
+                expanded={expandedSections.has("mcp")}
+                onToggle={() => toggleSection("mcp")}
+                onAddServer={() => setEditingMcpServer({ isOpen: true, serverId: "", server: null, mode: "add" })}
+                onEditServer={setEditingMcpServer}
+                onToggleServer={toggleMcpServer}
+              />
+
+              <ToolsSection
+                config={config}
+                expanded={expandedSections.has("tools")}
+                onToggle={() => toggleSection("tools")}
+                onUpdateToolsExec={updateToolsExecConfig}
+                onUpdateToolsWebSearch={updateToolsWebSearchConfig}
+                onUpdateToolsConfig={updateToolsConfig}
+              />
             </div>
-          )}
-        </div>
-
-        {/* Channels 配置 */}
-        <div className="bg-white dark:bg-dark-bg-card rounded-lg border border-gray-200 dark:border-dark-border-subtle overflow-hidden transition-colors duration-200">
-          <button
-            onClick={() => toggleSection("channels")}
-            className="w-full p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-dark-bg-hover transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-50 dark:bg-green-900/30 rounded-lg">
-                <MessageSquare className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary">
-                {t("config.messageChannels")}
-              </h2>
-            </div>
-            {expandedSections.has("channels") ? (
-              <ChevronUp className="w-5 h-5 text-gray-400 dark:text-dark-text-muted" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-gray-400 dark:text-dark-text-muted" />
-            )}
-          </button>
-
-          {expandedSections.has("channels") && (
-            <div className="p-5 pt-0 space-y-4">
-              {/* 全局设置 - sendProgress 和 sendToolHints */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-4 border border-blue-100 dark:border-blue-800/30">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="p-1.5 bg-blue-100 dark:bg-blue-800/50 rounded-lg">
-                    <Settings className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-                    {t("config.channelsGlobalSettings")}
-                  </h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* sendProgress */}
-                  <div className={`flex items-center justify-between p-3 rounded-lg transition-all ${
-                    config.channels?.sendProgress
-                      ? "bg-green-100/80 dark:bg-green-900/30 border border-green-200 dark:border-green-700/50"
-                      : "bg-white/60 dark:bg-dark-bg-card/60 border border-transparent"
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg transition-colors ${
-                        config.channels?.sendProgress
-                          ? "bg-green-500 text-white"
-                          : "bg-gray-200 dark:bg-dark-bg-hover text-gray-500 dark:text-dark-text-muted"
-                      }`}>
-                        <Radio className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-900 dark:text-dark-text-primary">
-                          {t("config.sendProgress")}
-                        </label>
-                        <p className="text-xs text-gray-500 dark:text-dark-text-muted">
-                          {t("config.sendProgressDesc")}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => updateChannelsTopLevel("sendProgress", !config.channels?.sendProgress)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        config.channels?.sendProgress ? "bg-green-500" : "bg-gray-300 dark:bg-dark-border-default"
-                      }`}
-                      title={config.channels?.sendProgress ? t("config.clickToDisable") : t("config.clickToEnable")}
-                    >
-                      <span
-                        className={`inline-block h-5 w-5 transform rounded-full bg-white dark:bg-dark-text-primary transition-transform shadow ${
-                          config.channels?.sendProgress ? "translate-x-5" : "translate-x-0.5"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  {/* sendToolHints */}
-                  <div className={`flex items-center justify-between p-3 rounded-lg transition-all ${
-                    config.channels?.sendToolHints
-                      ? "bg-amber-100/80 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50"
-                      : "bg-white/60 dark:bg-dark-bg-card/60 border border-transparent"
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg transition-colors ${
-                        config.channels?.sendToolHints
-                          ? "bg-amber-500 text-white"
-                          : "bg-gray-200 dark:bg-dark-bg-hover text-gray-500 dark:text-dark-text-muted"
-                      }`}>
-                        <Sparkles className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-900 dark:text-dark-text-primary">
-                          {t("config.sendToolHints")}
-                        </label>
-                        <p className="text-xs text-gray-500 dark:text-dark-text-muted">
-                          {t("config.sendToolHintsDesc")}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => updateChannelsTopLevel("sendToolHints", !config.channels?.sendToolHints)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        config.channels?.sendToolHints ? "bg-amber-500" : "bg-gray-300 dark:bg-dark-border-default"
-                      }`}
-                      title={config.channels?.sendToolHints ? t("config.clickToDisable") : t("config.clickToEnable")}
-                    >
-                      <span
-                        className={`inline-block h-5 w-5 transform rounded-full bg-white dark:bg-dark-text-primary transition-transform shadow ${
-                          config.channels?.sendToolHints ? "translate-x-5" : "translate-x-0.5"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* 可用的渠道列表 */}
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600 dark:text-dark-text-secondary mb-3">{t("config.selectChannel")}</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {CHANNELS_CONFIG.map((channel) => {
-                    const isEnabled = config.channels?.[channel.key]?.enabled || false;
-                    return (
-                      <div
-                        key={channel.key}
-                        className={`group rounded-lg border transition-all hover:shadow-md ${
-                          isEnabled
-                            ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-500/50"
-                            : "bg-white dark:bg-dark-bg-card border-gray-200 dark:border-dark-border-subtle hover:border-gray-300 dark:hover:border-dark-border-default"
-                        }`}
-                      >
-                        <div className="w-full p-4 text-left">
-                          <div className="flex items-center justify-between">
-                            <div
-                              className="flex items-center gap-2 flex-1 cursor-pointer"
-                              onClick={() =>
-                                setEditingChannel({
-                                  isOpen: true,
-                                  channelKey: channel.key,
-                                  channelInfo: channel,
-                                })
-                              }
-                            >
-                              <div className={`p-2 rounded-lg ${channel.colorClass.split(' text-')[0]}`}>
-                                <MessageSquare className={`w-5 h-5 ${'text-' + channel.colorClass.split(' text-')[1]}`} />
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <h3 className="font-semibold text-gray-900 dark:text-dark-text-primary text-sm">
-                                    {t(channel.nameKey)}
-                                  </h3>
-                                  {isEnabled && (
-                                    <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full">
-                                      {t("config.enabled")}
-                                    </span>
-                                  )}
-                                  {!isEnabled && (
-                                    <span className="px-2 py-0.5 bg-gray-100 dark:bg-dark-bg-hover text-gray-600 dark:text-dark-text-muted text-xs rounded-full">
-                                      {t("config.notEnabled")}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateChannel(channel.key, !isEnabled);
-                              }}
-                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                isEnabled ? "bg-blue-600" : "bg-gray-300 dark:bg-dark-border-default"
-                              }`}
-                              title={isEnabled ? t("config.clickToDisable") : t("config.clickToEnable")}
-                            >
-                              <span
-                                className={`inline-block h-5 w-5 transform rounded-full bg-white dark:bg-dark-text-primary transition-transform shadow ${
-                                  isEnabled ? "translate-x-5" : "translate-x-0.5"
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {Object.keys(config.channels || {}).length === 0 && (
-                <EmptyState
-                  icon={Inbox}
-                  title={t("config.noChannelsConfigured")}
-                  description={t("dashboard.clickToStartConfig")}
-                />
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* MCP Servers 配置 */}
-        <div className="bg-white dark:bg-dark-bg-card rounded-lg border border-gray-200 dark:border-dark-border-subtle overflow-hidden transition-colors duration-200">
-          <button
-            onClick={() => toggleSection("mcp")}
-            className="w-full p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-dark-bg-hover transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg">
-                <Plug className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary">
-                {t("mcp.title")}
-              </h2>
-            </div>
-            {expandedSections.has("mcp") ? (
-              <ChevronUp className="w-5 h-5 text-gray-400 dark:text-dark-text-muted" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-gray-400 dark:text-dark-text-muted" />
-            )}
-          </button>
-
-          {expandedSections.has("mcp") && (
-            <div className="p-5 pt-0 space-y-4">
-              {/* MCP Server 列表 */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm text-gray-600 dark:text-dark-text-secondary">{t("mcp.description")}</p>
-                  <button
-                    onClick={() =>
-                      setEditingMcpServer({
-                        isOpen: true,
-                        serverId: "",
-                        server: null,
-                        mode: "add",
-                      })
-                    }
-                    className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm font-medium"
-                  >
-                    <Plus className="w-4 h-4" />
-                    {t("mcp.addServer")}
-                  </button>
-                </div>
-
-                {Object.keys(mcpServersConfig).length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {Object.entries(mcpServersConfig).map(([serverId, server]) => {
-                      const isHttpMode = !!server.url;
-                      const isEnabled = !server.disabled;
-                      return (
-                        <div
-                          key={serverId}
-                          className={`group rounded-lg border transition-all hover:shadow-md ${
-                            isEnabled
-                              ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-500/50"
-                              : "bg-gray-50 dark:bg-dark-bg-card border-gray-200 dark:border-dark-border-subtle"
-                          }`}
-                        >
-                          <div className="w-full p-4 text-left">
-                            <div className="flex items-center justify-between">
-                              <div
-                                className="flex items-center gap-2 flex-1 cursor-pointer"
-                                onClick={() =>
-                                  setEditingMcpServer({
-                                    isOpen: true,
-                                    serverId,
-                                    server,
-                                    mode: "edit",
-                                  })
-                                }
-                              >
-                                <div className={`p-2 rounded-lg ${
-                                  isEnabled
-                                    ? "bg-emerald-100 dark:bg-emerald-900/30"
-                                    : "bg-gray-100 dark:bg-dark-bg-hover"
-                                }`}>
-                                  {isHttpMode ? (
-                                    <Globe className={`w-5 h-5 ${isEnabled ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-dark-text-muted"}`} />
-                                  ) : (
-                                    <Terminal className={`w-5 h-5 ${isEnabled ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-dark-text-muted"}`} />
-                                  )}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <h3 className="font-semibold text-gray-900 dark:text-dark-text-primary text-sm truncate" title={serverId}>
-                                    {serverId}
-                                  </h3>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <p className="text-xs text-gray-500 dark:text-dark-text-muted">
-                                      {isHttpMode ? t("mcp.http") : t("mcp.stdio")}
-                                    </p>
-                                    {isEnabled ? (
-                                      <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs rounded-full whitespace-nowrap">
-                                        {t("config.enabled")}
-                                      </span>
-                                    ) : (
-                                      <span className="px-2 py-0.5 bg-gray-100 dark:bg-dark-bg-hover text-gray-600 dark:text-dark-text-muted text-xs rounded-full whitespace-nowrap">
-                                        {t("config.notEnabled")}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleMcpServer(serverId);
-                                }}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                  isEnabled ? "bg-blue-600" : "bg-gray-300 dark:bg-dark-border-default"
-                                }`}
-                                title={isEnabled ? t("config.clickToDisable") : t("config.clickToEnable")}
-                              >
-                                <span
-                                  className={`inline-block h-5 w-5 transform rounded-full bg-white dark:bg-dark-text-primary transition-transform shadow ${
-                                    isEnabled ? "translate-x-5" : "translate-x-0.5"
-                                  }`}
-                                />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={Plug}
-                    title={t("mcp.noServers")}
-                    description={t("mcp.noServersDesc")}
-                  />
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Tools 配置 */}
-        <div className="bg-white dark:bg-dark-bg-card rounded-lg border border-gray-200 dark:border-dark-border-subtle overflow-hidden transition-colors duration-200">
-          <button
-            onClick={() => toggleSection("tools")}
-            className="w-full p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-dark-bg-hover transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
-                <Wrench className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary">
-                {t("config.toolsConfig")}
-              </h2>
-            </div>
-            {expandedSections.has("tools") ? (
-              <ChevronUp className="w-5 h-5 text-gray-400 dark:text-dark-text-muted" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-gray-400 dark:text-dark-text-muted" />
-            )}
-          </button>
-
-          {expandedSections.has("tools") && (
-            <div className="p-5 pt-0 space-y-6">
-              {/* Exec 配置 */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-dark-text-secondary flex items-center gap-2">
-                  <Terminal className="w-4 h-4" />
-                  {t("config.execConfig")}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
-                      {t("config.execTimeout")}
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        value={config.tools?.exec?.timeout ?? 60}
-                        onChange={(e) => updateToolsExecConfig("timeout", parseInt(e.target.value) || 60)}
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary"
-                      />
-                      <span className="text-sm text-gray-500 dark:text-dark-text-muted whitespace-nowrap">
-                        {t("config.seconds")}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-400 dark:text-dark-text-muted mt-1">
-                      {t("config.execTimeoutDesc")}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
-                      {t("config.pathAppendLabel")}
-                    </label>
-                    <input
-                      type="text"
-                      value={config.tools?.exec?.pathAppend ?? ""}
-                      onChange={(e) => updateToolsExecConfig("pathAppend", e.target.value)}
-                      placeholder={t("config.pathAppendPlaceholder")}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted"
-                    />
-                    <p className="text-xs text-gray-400 dark:text-dark-text-muted mt-1">
-                      {t("config.pathAppendDesc")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Web Search 配置 */}
-              <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-dark-border-subtle">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-dark-text-secondary flex items-center gap-2">
-                  <Globe className="w-4 h-4" />
-                  {t("config.webSearchConfig")}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
-                      {t("config.webSearchApiKey")}
-                    </label>
-                    <input
-                      type="password"
-                      value={config.tools?.web?.search?.apiKey || ""}
-                      onChange={(e) => updateToolsWebSearchConfig("apiKey", e.target.value)}
-                      placeholder={t("config.apiKeyPlaceholder")}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted"
-                    />
-                    <p className="text-xs text-gray-400 dark:text-dark-text-muted mt-1">
-                      {t("config.webSearchApiKeyDesc")}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
-                      {t("config.webSearchMaxResults")}
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="20"
-                      value={config.tools?.web?.search?.maxResults ?? 5}
-                      onChange={(e) => updateToolsWebSearchConfig("maxResults", parseInt(e.target.value) || 5)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary"
-                    />
-                    <p className="text-xs text-gray-400 dark:text-dark-text-muted mt-1">
-                      {t("config.webSearchMaxResultsDesc")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Security 配置 */}
-        <div className="bg-white dark:bg-dark-bg-card rounded-lg border border-gray-200 dark:border-dark-border-subtle overflow-hidden transition-colors duration-200">
-          <button
-            onClick={() => toggleSection("security")}
-            className="w-full p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-dark-bg-hover transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-50 dark:bg-amber-900/30 rounded-lg">
-                <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary">
-                {t("config.security")}
-              </h2>
-            </div>
-            {expandedSections.has("security") ? (
-              <ChevronUp className="w-5 h-5 text-gray-400 dark:text-dark-text-muted" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-gray-400 dark:text-dark-text-muted" />
-            )}
-          </button>
-
-          {expandedSections.has("security") && (
-            <div className="p-5 pt-0 space-y-4">
-              <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
-                {t("config.securityDesc")}
-              </p>
-
-              <div className="space-y-3">
-                {/* restrictToWorkspace */}
-                <div className={`rounded-lg border p-4 transition-all ${
-                  config.tools?.restrictToWorkspace
-                    ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-500/50"
-                    : "bg-white dark:bg-dark-bg-card border-gray-200 dark:border-dark-border-subtle"
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 mr-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-gray-900 dark:text-dark-text-primary text-sm">
-                          {t("config.restrictToWorkspace")}
-                        </h3>
-                        {config.tools?.restrictToWorkspace && (
-                          <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs rounded-full">
-                            {t("config.enabled")}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 dark:text-dark-text-muted">
-                        {t("config.restrictToWorkspaceDesc")}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => updateToolsConfig("restrictToWorkspace", !config.tools?.restrictToWorkspace)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
-                        config.tools?.restrictToWorkspace ? "bg-amber-500" : "bg-gray-300 dark:bg-dark-border-default"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-5 w-5 transform rounded-full bg-white dark:bg-dark-text-primary transition-transform shadow ${
-                          config.tools?.restrictToWorkspace ? "translate-x-5" : "translate-x-0.5"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
           </div>
-        </div>
-      ) : (
-        <CodeEditorView
-          code={code}
-          codeError={codeError}
-          savingCode={savingCode}
-          hasChanges={code !== JSON.stringify(originalConfig, null, 2)}
-          onCodeChange={handleCodeChange}
-          onFormat={formatCode}
-          onSave={saveCodeConfig}
-        />
-      )}
+        ) : (
+          <CodeEditorView
+            code={code}
+            codeError={codeError}
+            savingCode={savingCode}
+            hasChanges={code !== JSON.stringify(originalConfig, null, 2)}
+            onCodeChange={handleCodeChange}
+            onFormat={formatCode}
+            onSave={saveCodeConfig}
+          />
+        )}
       </div>
 
-      {/* 确认对话框 */}
+      {/* 对话框 */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         title={confirmDialog.title}
@@ -1850,12 +818,11 @@ export default function ConfigEditor() {
         onCancel={() => setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: () => {} })}
       />
 
-      {/* 保存模板对话框 */}
       {templateDialog.isOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-dark-bg-card rounded-xl shadow-xl max-w-md w-full p-6 transition-colors duration-200">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary mb-4">
-              {templateDialog.mode === "save" ? t("config.saveTemplateTitle", { saveConfig: t("config.saveConfig") }) : t("config.editTemplate")}
+              {t("config.saveTemplateTitle")}
             </h3>
             <div className="space-y-4">
               <div>
@@ -1867,14 +834,11 @@ export default function ConfigEditor() {
                   value={templateDialog.name}
                   onChange={(e) => setTemplateDialog({ ...templateDialog, name: e.target.value })}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      confirmSaveTemplate();
-                    } else if (e.key === "Escape") {
-                      setTemplateDialog({ isOpen: false, mode: "save", name: "", description: "" });
-                    }
+                    if (e.key === "Enter") confirmSaveTemplate();
+                    else if (e.key === "Escape") setTemplateDialog({ isOpen: false, mode: "save", name: "", description: "" });
                   }}
-                  placeholder={t("config.forExample") + " OpenAI 配置、开发环境配置"}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted"
+                  placeholder={t("config.forExample")}
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                   autoFocus
                 />
               </div>
@@ -1885,9 +849,8 @@ export default function ConfigEditor() {
                 <textarea
                   value={templateDialog.description}
                   onChange={(e) => setTemplateDialog({ ...templateDialog, description: e.target.value })}
-                  placeholder={t("config.templateDescPlaceholder")}
                   rows={3}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm resize-none text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
                 />
               </div>
             </div>
@@ -1909,7 +872,7 @@ export default function ConfigEditor() {
         </div>
       )}
 
-      {/* 提供商编辑模态框 */}
+      {/* 模态框 */}
       <ProviderEditModal
         isOpen={editingProvider.isOpen}
         providerId={editingProvider.providerId}
@@ -1924,14 +887,13 @@ export default function ConfigEditor() {
         onRemoveProvider={removeProvider}
         onUpdateProviderAgentConfig={updateProviderAgentConfig}
         onOAuthStatusChange={(pid, hasToken, isExpired) => {
-          setOauthTokenStatuses(prev => ({
+          setOauthTokenStatuses((prev) => ({
             ...prev,
             [pid]: hasToken ? (isExpired ? "expired" : true) : false,
           }));
         }}
       />
 
-      {/* 渠道编辑模态框 */}
       <ChannelEditModal
         isOpen={editingChannel.isOpen}
         channelKey={editingChannel.channelKey}
@@ -1941,15 +903,12 @@ export default function ConfigEditor() {
         onUpdateField={updateChannelField}
       />
 
-      {/* MCP Server 编辑模态框 */}
       <McpServerEditModal
         isOpen={editingMcpServer.isOpen}
         serverId={editingMcpServer.serverId}
         server={editingMcpServer.server}
         mode={editingMcpServer.mode}
-        onClose={() =>
-          setEditingMcpServer({ isOpen: false, serverId: "", server: null, mode: "add" })
-        }
+        onClose={() => setEditingMcpServer({ isOpen: false, serverId: "", server: null, mode: "add" })}
         onSave={saveMcpServer}
         onDelete={deleteMcpServer}
       />

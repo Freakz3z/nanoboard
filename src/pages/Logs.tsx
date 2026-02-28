@@ -5,6 +5,7 @@ import { useToast } from "../contexts/ToastContext";
 import { Play, Square, Search, X, Inbox, Download, BarChart3, Regex } from "lucide-react";
 import EmptyState from "../components/EmptyState";
 import { Virtuoso } from "react-virtuoso";
+import { LogItem } from "../components/logs";
 
 interface LogStatistics {
   total: number;
@@ -18,7 +19,6 @@ interface LogStatistics {
   errorPercent: number;
 }
 
-// 日志级别匹配模式（统一管理避免重复）
 const LOG_LEVEL_PATTERNS = {
   debug: /\|\s*DEBUG\s*\|/i,
   info: /\|\s*INFO\s*\|/i,
@@ -26,23 +26,11 @@ const LOG_LEVEL_PATTERNS = {
   error: /\|\s*ERROR\s*\|/i,
 } as const;
 
-// 日志级别颜色映射
 function getLogLevelColor(log: string): string {
-  // 检测日志级别并返回对应的颜色类名
-  if (LOG_LEVEL_PATTERNS.debug.test(log)) {
-    // DEBUG: 灰色
-    return "text-gray-500 dark:text-gray-400";
-  } else if (LOG_LEVEL_PATTERNS.info.test(log)) {
-    // INFO: 蓝色
-    return "text-blue-600 dark:text-blue-400";
-  } else if (LOG_LEVEL_PATTERNS.warn.test(log)) {
-    // WARN: 琥珀色/黄色
-    return "text-amber-600 dark:text-amber-400";
-  } else if (LOG_LEVEL_PATTERNS.error.test(log)) {
-    // ERROR: 红色
-    return "text-red-600 dark:text-red-400";
-  }
-  // 默认颜色
+  if (LOG_LEVEL_PATTERNS.debug.test(log)) return "text-gray-500 dark:text-gray-400";
+  else if (LOG_LEVEL_PATTERNS.info.test(log)) return "text-blue-600 dark:text-blue-400";
+  else if (LOG_LEVEL_PATTERNS.warn.test(log)) return "text-amber-600 dark:text-amber-400";
+  else if (LOG_LEVEL_PATTERNS.error.test(log)) return "text-red-600 dark:text-red-400";
   return "text-gray-700 dark:text-dark-text-secondary";
 }
 
@@ -50,131 +38,83 @@ export default function Logs() {
   const { t } = useTranslation();
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  // 从 localStorage 初始化 streaming 状态，避免切换页面时状态不一致
   const [streaming, setStreaming] = useState(() => localStorage.getItem("logStreaming") === "true");
   const [searchQuery, setSearchQuery] = useState("");
   const [useRegex, setUseRegex] = useState(false);
   const [regexError, setRegexError] = useState<string | null>(null);
   const [logLevel, setLogLevel] = useState<"all" | "debug" | "info" | "warn" | "error">("all");
   const [showStatistics, setShowStatistics] = useState(false);
-  // 统计信息已移至 useMemo 计算，这里保留状态用于类型兼容
   const [_stats, _setStats] = useState<LogStatistics>({
-    total: 0,
-    debug: 0,
-    info: 0,
-    warn: 0,
-    error: 0,
-    debugPercent: 0,
-    infoPercent: 0,
-    warnPercent: 0,
-    errorPercent: 0,
+    total: 0, debug: 0, info: 0, warn: 0, error: 0,
+    debugPercent: 0, infoPercent: 0, warnPercent: 0, errorPercent: 0,
   });
-  // 使用 useRef 存储取消监听函数，避免内存泄漏
   const unlistenRef = useRef<(() => void) | null>(null);
   const toast = useToast();
 
   useEffect(() => {
     loadLogs();
-
-    // 检查是否需要自动开始监控
     const shouldAutoStart = localStorage.getItem("autoStartLogMonitor");
     if (shouldAutoStart === "true") {
-      // 清除标志
       localStorage.removeItem("autoStartLogMonitor");
-      // 延迟启动，确保页面已加载
-      setTimeout(() => {
-        toggleStream();
-      }, 500);
+      setTimeout(() => toggleStream(), 500);
     } else {
-      // 同步后端和前端的流状态
       syncStreamState();
     }
-
-    // 组件卸载时清理事件监听器
     return () => {
       if (unlistenRef.current) {
-        try {
-          unlistenRef.current();
-        } catch (e: unknown) {
-          console.error("取消监听失败:", e);
-        }
+        try { unlistenRef.current(); } catch (e: unknown) { console.error("取消监听失败:", e); }
         unlistenRef.current = null;
       }
     };
   }, []);
 
-  // 同步后端和前端的流状态
   async function syncStreamState() {
     try {
-      // 检查后端实际状态
       const isBackendRunning = await loggerApi.isStreamRunning();
       const wasStreaming = localStorage.getItem("logStreaming") === "true";
 
       if (wasStreaming && !isBackendRunning) {
-        // 前端认为在运行但后端已停止，需要重新启动
         setTimeout(async () => {
           try {
             await loggerApi.startStream();
-
-            const unlisten = await events.onLogUpdate((newLogs) => {
-              setLogs((prev) => [...prev, ...newLogs]);
-            });
-
+            const unlisten = await events.onLogUpdate((newLogs) => setLogs((prev) => [...prev, ...newLogs]));
             unlistenRef.current = unlisten;
             setStreaming(true);
-          } catch (error) {
-            console.error("恢复监控失败:", error);
+          } catch {
             localStorage.setItem("logStreaming", "false");
             setStreaming(false);
           }
         }, 100);
       } else if (!wasStreaming && isBackendRunning) {
-        // 前端认为停止但后端在运行，以后端状态为准
-        // 需要设置前端监听器
         setTimeout(async () => {
           try {
-            const unlisten = await events.onLogUpdate((newLogs) => {
-              setLogs((prev) => [...prev, ...newLogs]);
-            });
-
+            const unlisten = await events.onLogUpdate((newLogs) => setLogs((prev) => [...prev, ...newLogs]));
             unlistenRef.current = unlisten;
             setStreaming(true);
             localStorage.setItem("logStreaming", "true");
-          } catch (error) {
-            console.error("设置监听失败:", error);
-          }
+          } catch { console.error("设置监听失败"); }
         }, 100);
       } else if (wasStreaming && isBackendRunning) {
-        // 两边都认为在运行，只需设置前端监听器
         setTimeout(async () => {
           try {
-            const unlisten = await events.onLogUpdate((newLogs) => {
-              setLogs((prev) => [...prev, ...newLogs]);
-            });
-
+            const unlisten = await events.onLogUpdate((newLogs) => setLogs((prev) => [...prev, ...newLogs]));
             unlistenRef.current = unlisten;
             setStreaming(true);
-          } catch (error) {
-            console.error("设置监听失败:", error);
+          } catch {
             setStreaming(false);
             localStorage.setItem("logStreaming", "false");
           }
         }, 100);
       }
-      // 如果两边都认为停止，不需要做任何事
-    } catch (error) {
-      console.error("检查后端状态失败:", error);
-      // 如果无法获取后端状态，清除前端状态避免不一致
+    } catch {
       setStreaming(false);
       localStorage.setItem("logStreaming", "false");
     }
   }
 
-  // 使用 useMemo 优化过滤逻辑，避免不必要的重新计算
   const filteredLogs = useMemo(() => {
     let filtered = logs;
     
-    // 应用搜索过滤
     if (searchQuery.trim()) {
       if (useRegex) {
         try {
@@ -183,7 +123,6 @@ export default function Logs() {
           setRegexError(null);
         } catch (error) {
           setRegexError(error instanceof Error ? error.message : t("logs.invalidRegex"));
-          // 正则表达式无效时，返回空结果
           return [];
         }
       } else {
@@ -194,7 +133,6 @@ export default function Logs() {
       setRegexError(null);
     }
 
-    // 应用级别过滤
     if (logLevel !== "all") {
       filtered = filtered.filter((log) => LOG_LEVEL_PATTERNS[logLevel].test(log));
     }
@@ -202,20 +140,13 @@ export default function Logs() {
     return filtered;
   }, [logs, searchQuery, useRegex, logLevel, t]);
 
-  // 使用 useMemo 计算统计信息
-  const statistics = useMemo(() => {
-    return calculateStatistics(filteredLogs);
-  }, [filteredLogs]);
+  const statistics = useMemo(() => calculateStatistics(filteredLogs), [filteredLogs]);
 
   function calculateStatistics(logsToAnalyze: string[]): LogStatistics {
     const total = logsToAnalyze.length;
-    let debug = 0;
-    let info = 0;
-    let warn = 0;
-    let error = 0;
+    let debug = 0, info = 0, warn = 0, error = 0;
 
     logsToAnalyze.forEach((log) => {
-      // 使用统一的日志级别匹配模式
       if (LOG_LEVEL_PATTERNS.debug.test(log)) debug++;
       else if (LOG_LEVEL_PATTERNS.info.test(log)) info++;
       else if (LOG_LEVEL_PATTERNS.warn.test(log)) warn++;
@@ -223,11 +154,7 @@ export default function Logs() {
     });
 
     return {
-      total,
-      debug,
-      info,
-      warn,
-      error,
+      total, debug, info, warn, error,
       debugPercent: total > 0 ? (debug / total) * 100 : 0,
       infoPercent: total > 0 ? (info / total) * 100 : 0,
       warnPercent: total > 0 ? (warn / total) * 100 : 0,
@@ -239,59 +166,28 @@ export default function Logs() {
     setLoading(true);
     try {
       const result = await loggerApi.getLogs(500);
-      const loadedLogs = result.logs || [];
-      setLogs(loadedLogs);
-      // 统计信息由 useMemo 自动计算
-    } catch (error) {
-      toast.showError(t("logs.loadLogsFailed"));
-    } finally {
-      setLoading(false);
-    }
+      setLogs(result.logs || []);
+    } catch { toast.showError(t("logs.loadLogsFailed")); }
+    finally { setLoading(false); }
   }
 
-  // 移除 filterLogs 函数，因为过滤逻辑已经移到 useMemo 中
-  // filterLogs 函数已废弃
-
-  function handleSearchChange(value: string) {
-    setSearchQuery(value);
-    // 过滤逻辑由 useMemo 自动处理
-  }
-
-  function handleLevelChange(level: "all" | "debug" | "info" | "warn" | "error") {
-    setLogLevel(level);
-    // 过滤逻辑由 useMemo 自动处理
-  }
-
-  function toggleRegexMode() {
-    setUseRegex(prev => !prev);
-    // 过滤逻辑由 useMemo 自动处理
-  }
-
-  function clearSearch() {
-    setSearchQuery("");
-    // 过滤逻辑由 useMemo 自动处理
-  }
+  function handleSearchChange(value: string) { setSearchQuery(value); }
+  function handleLevelChange(level: "all" | "debug" | "info" | "warn" | "error") { setLogLevel(level); }
+  function toggleRegexMode() { setUseRegex(prev => !prev); }
+  function clearSearch() { setSearchQuery(""); }
 
   async function exportLogs() {
     try {
-      // 导出当前过滤后的日志
       const content = filteredLogs.join("\n");
-
-      // 创建并下载文件
       const blob = new Blob([content], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
 
-      // 生成文件名（包含时间戳和过滤信息）
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
       let filename = `logs-${timestamp}`;
-      if (logLevel !== "all") {
-        filename += `-${logLevel}`;
-      }
-      if (searchQuery) {
-        filename += "-filtered";
-      }
+      if (logLevel !== "all") filename += `-${logLevel}`;
+      if (searchQuery) filename += "-filtered";
       filename += ".txt";
 
       a.download = filename;
@@ -301,9 +197,7 @@ export default function Logs() {
       URL.revokeObjectURL(url);
 
       toast.showSuccess(t("logs.logsExported", { count: filteredLogs.length }));
-    } catch (error) {
-      toast.showError(t("logs.exportFailed"));
-    }
+    } catch { toast.showError(t("logs.exportFailed")); }
   }
 
   async function toggleStream() {
@@ -312,20 +206,12 @@ export default function Logs() {
         await loggerApi.stopStream();
         setStreaming(false);
         localStorage.setItem("logStreaming", "false");
-        // 清理监听器
         if (unlistenRef.current) {
-          try {
-            unlistenRef.current();
-          } catch (e) {
-            console.error("取消监听失败:", e);
-          }
+          try { unlistenRef.current(); } catch (e) { console.error("取消监听失败:", e); }
           unlistenRef.current = null;
         }
         toast.showInfo(t("logs.stopMonitoring"));
-      } catch (error) {
-        console.error("Stop monitoring failed:", error);
-        toast.showError(t("logs.stopMonitoringFailed"));
-      }
+      } catch { toast.showError(t("logs.stopMonitoringFailed")); }
     } else {
       try {
         setLoading(true);
@@ -333,35 +219,21 @@ export default function Logs() {
         setStreaming(true);
         localStorage.setItem("logStreaming", "true");
 
-        // 监听日志更新 - 只负责添加日志
         const unlisten = await events.onLogUpdate((newLogs) => {
-          setLogs((prev) => {
-            const updated = [...prev, ...newLogs];
-            return updated;
-          });
+          setLogs((prev) => [...prev, ...newLogs]);
         });
 
-        // 使用 useRef 存储取消监听函数
         unlistenRef.current = unlisten;
-
         toast.showSuccess(t("logs.startMonitoring"));
       } catch (error) {
-        console.error("启动监控失败:", error);
-        // Tauri 错误通常是字符串
         let errorMessage = t("logs.startMonitoringFailed");
-        if (typeof error === "string") {
-          errorMessage = error;
-        } else if (error instanceof Error) {
-          errorMessage = error.message;
-        } else if (error && typeof error === "object" && "message" in error) {
-          errorMessage = String(error.message);
-        }
+        if (typeof error === "string") errorMessage = error;
+        else if (error instanceof Error) errorMessage = error.message;
+        else if (error && typeof error === "object" && "message" in error) errorMessage = String(error.message);
         toast.showError(`${t("logs.startMonitoringFailed")}: ${errorMessage}`);
         setStreaming(false);
         localStorage.setItem("logStreaming", "false");
-      } finally {
-        setLoading(false);
-      }
+      } finally { setLoading(false); }
     }
   }
 
@@ -397,17 +269,13 @@ export default function Logs() {
               {useRegex ? t("logs.regexSearch") : t("logs.normalSearch")}
             </button>
             {searchQuery && (
-              <button
-                onClick={clearSearch}
-                className="p-1 text-gray-400 dark:text-dark-text-muted hover:text-gray-600 dark:hover:text-dark-text-primary transition-colors"
-              >
+              <button onClick={clearSearch} className="p-1 text-gray-400 dark:text-dark-text-muted hover:text-gray-600 dark:hover:text-dark-text-primary transition-colors">
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
         </div>
 
-        {/* 正则表达式错误提示 */}
         {regexError && (
           <div className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
             <span>⚠️ {regexError}</span>
@@ -419,106 +287,68 @@ export default function Logs() {
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500 dark:text-dark-text-muted">{t("logs.level")}</span>
             <div className="flex gap-1">
-              <button
-                onClick={() => handleLevelChange("all")}
+              <button onClick={() => handleLevelChange("all")}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  logLevel === "all"
-                    ? "bg-gray-800 dark:bg-dark-text-primary text-white"
-                    : "bg-gray-100 dark:bg-dark-bg-hover text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-bg-active"
-                }`}
-              >
+                  logLevel === "all" ? "bg-gray-800 dark:bg-dark-text-primary text-white"
+                  : "bg-gray-100 dark:bg-dark-bg-hover text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-bg-active"
+                }`}>
                 {t("logs.all")}
               </button>
-              <button
-                onClick={() => handleLevelChange("info")}
+              <button onClick={() => handleLevelChange("info")}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  logLevel === "info"
-                    ? "bg-blue-600 text-white"
-                    : "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50"
-                }`}
-              >
+                  logLevel === "info" ? "bg-blue-600 text-white"
+                  : "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                }`}>
                 INFO
               </button>
-              <button
-                onClick={() => handleLevelChange("debug")}
+              <button onClick={() => handleLevelChange("debug")}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  logLevel === "debug"
-                    ? "bg-gray-600 text-white"
-                    : "bg-gray-50 dark:bg-dark-bg-hover text-gray-600 dark:text-dark-text-secondary hover:bg-gray-100 dark:hover:bg-dark-bg-active"
-                }`}
-              >
+                  logLevel === "debug" ? "bg-gray-600 text-white"
+                  : "bg-gray-50 dark:bg-dark-bg-hover text-gray-600 dark:text-dark-text-secondary hover:bg-gray-100 dark:hover:bg-dark-bg-active"
+                }`}>
                 DEBUG
               </button>
-              <button
-                onClick={() => handleLevelChange("warn")}
+              <button onClick={() => handleLevelChange("warn")}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  logLevel === "warn"
-                    ? "bg-amber-600 text-white"
-                    : "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50"
-                }`}
-              >
+                  logLevel === "warn" ? "bg-amber-600 text-white"
+                  : "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                }`}>
                 WARN
               </button>
-              <button
-                onClick={() => handleLevelChange("error")}
+              <button onClick={() => handleLevelChange("error")}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  logLevel === "error"
-                    ? "bg-red-600 text-white"
-                    : "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
-                }`}
-              >
+                  logLevel === "error" ? "bg-red-600 text-white"
+                  : "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
+                }`}>
                 ERROR
               </button>
             </div>
           </div>
 
-          {/* 操作按钮 */}
           <div className="flex items-center gap-2 ml-auto">
-            <button
-              onClick={() => setShowStatistics(!showStatistics)}
+            <button onClick={() => setShowStatistics(!showStatistics)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium ${
-                showStatistics
-                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : "bg-gray-100 dark:bg-dark-bg-hover text-gray-700 dark:text-dark-text-primary hover:bg-gray-200 dark:hover:bg-dark-bg-active"
-              }`}
-            >
+                showStatistics ? "bg-blue-600 text-white hover:bg-blue-700"
+                : "bg-gray-100 dark:bg-dark-bg-hover text-gray-700 dark:text-dark-text-primary hover:bg-gray-200 dark:hover:bg-dark-bg-active"
+              }`}>
               <BarChart3 className="w-4 h-4" />
               {t("logs.statistics")}
             </button>
-            <button
-              onClick={exportLogs}
-              disabled={filteredLogs.length === 0}
+            <button onClick={exportLogs} disabled={filteredLogs.length === 0}
               className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-dark-bg-hover hover:bg-gray-200 dark:hover:bg-dark-bg-active disabled:bg-gray-50 dark:disabled:bg-dark-bg-sidebar disabled:cursor-not-allowed rounded-lg transition-colors text-sm font-medium text-gray-700 dark:text-dark-text-primary"
-              title={t("logs.export")}
-            >
+              title={t("logs.export")}>
               <Download className="w-4 h-4" />
               {t("logs.export")}
             </button>
-            <button
-              onClick={toggleStream}
-              disabled={loading}
+            <button onClick={toggleStream} disabled={loading}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium text-white ${
-                streaming
-                  ? "bg-red-600 hover:bg-red-700"
-                  : "bg-green-600 hover:bg-green-700"
-              } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
-            >
-              {streaming ? (
-                <>
-                  <Square className="w-4 h-4" />
-                  {t("logs.stop")}
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4" />
-                  {t("logs.start")}
-                </>
-              )}
+                streaming ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
+              } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}>
+              {streaming ? (<><Square className="w-4 h-4" />{t("logs.stop")}</>) : (<><Play className="w-4 h-4" />{t("logs.start")}</>)}
             </button>
           </div>
         </div>
 
-        {/* 过滤结果提示 */}
         {(searchQuery || logLevel !== "all") && (
           <div className="mt-2 text-sm text-gray-500 dark:text-dark-text-muted">
             {t("logs.findMatches", { count: filteredLogs.length, total: logs.length })}
@@ -537,76 +367,34 @@ export default function Logs() {
               </div>
 
               <div className="space-y-3">
-                {/* INFO */}
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-blue-600 dark:text-blue-400 font-medium">INFO</span>
-                    <span className="text-gray-600 dark:text-dark-text-secondary">
-                      {statistics.info} {t("dashboard.entries")} ({statistics.infoPercent.toFixed(1)}%)
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-dark-bg-hover rounded-full h-2">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${statistics.infoPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* DEBUG */}
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-gray-600 dark:text-gray-400 font-medium">DEBUG</span>
-                    <span className="text-gray-600 dark:text-dark-text-secondary">
-                      {statistics.debug} {t("dashboard.entries")} ({statistics.debugPercent.toFixed(1)}%)
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-dark-bg-hover rounded-full h-2">
-                    <div
-                      className="bg-gray-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${statistics.debugPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* WARN */}
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-amber-600 dark:text-amber-400 font-medium">WARN</span>
-                    <span className="text-gray-600 dark:text-dark-text-secondary">
-                      {statistics.warn} {t("dashboard.entries")} ({statistics.warnPercent.toFixed(1)}%)
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-dark-bg-hover rounded-full h-2">
-                    <div
-                      className="bg-amber-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${statistics.warnPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* ERROR */}
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-red-600 dark:text-red-400 font-medium">ERROR</span>
-                    <span className="text-gray-600 dark:text-dark-text-secondary">
-                      {statistics.error} {t("dashboard.entries")} ({statistics.errorPercent.toFixed(1)}%)
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-dark-bg-hover rounded-full h-2">
-                    <div
-                      className="bg-red-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${statistics.errorPercent}%` }}
-                    />
-                  </div>
-                </div>
+                {(["info", "debug", "warn", "error"] as const).map((level) => {
+                  const colors: Record<string, string> = {
+                    info: "bg-blue-600 text-blue-600",
+                    debug: "bg-gray-600 text-gray-600",
+                    warn: "bg-amber-600 text-amber-600",
+                    error: "bg-red-600 text-red-600",
+                  };
+                  const count = statistics[level];
+                  const percent = statistics[`${level}Percent` as keyof LogStatistics] as number;
+                  return (
+                    <div key={level}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className={`${colors[level].split(" ")[1]} dark:${colors[level].split(" ")[1]} font-medium`}>{level.toUpperCase()}</span>
+                        <span className="text-gray-600 dark:text-dark-text-secondary">{count} {t("dashboard.entries")} ({percent.toFixed(1)}%)</span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-dark-bg-hover rounded-full h-2">
+                        <div className={`${colors[level].split(" ")[0]} h-2 rounded-full transition-all duration-300`} style={{ width: `${percent}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* 日志内容 - 使用虚拟滚动 */}
+      {/* 日志内容 - 使用虚拟滚动和 LogItem 组件 */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-dark-bg-sidebar text-gray-500 dark:text-dark-text-muted">
           {t("config.loading")}
@@ -615,24 +403,14 @@ export default function Logs() {
         <EmptyState
           icon={Inbox}
           title={searchQuery ? t("logs.noMatchingLogs") : t("logs.noLogs")}
-          description={
-            searchQuery
-              ? t("logs.tryDifferentKeywords")
-              : t("logs.startNanobotForLogs")
-          }
+          description={searchQuery ? t("logs.tryDifferentKeywords") : t("logs.startNanobotForLogs")}
         />
       ) : (
         <div className="flex-1 overflow-hidden">
           <Virtuoso
             style={{ height: '100%' }}
             data={filteredLogs}
-            itemContent={(_index, log) => (
-              <div
-                className={`hover:bg-white dark:hover:bg-dark-bg-card px-2 py-1 rounded whitespace-pre-wrap break-words border border-transparent hover:border-gray-200 dark:hover:border-dark-border-subtle transition-colors duration-200 ${getLogLevelColor(log)}`}
-              >
-                {log}
-              </div>
-            )}
+            itemContent={(_index, log) => <LogItem log={log} />}
             followOutput="smooth"
           />
         </div>
@@ -640,18 +418,8 @@ export default function Logs() {
 
       {/* 状态栏 */}
       <div className="bg-white dark:bg-dark-bg-card border-t border-gray-200 dark:border-dark-border-subtle px-4 py-2 flex items-center justify-between text-sm text-gray-500 dark:text-dark-text-muted transition-colors duration-200">
-        <span>
-          {searchQuery
-            ? t("logs.displayLogs", { filtered: filteredLogs.length, total: logs.length })
-            : t("logs.totalLogs", { total: logs.length })}
-        </span>
-        <span>
-          {streaming ? (
-            <span className="text-green-600 dark:text-green-400">● {t("logs.realtimeMonitoring")}</span>
-          ) : (
-            <span className="text-amber-600 dark:text-amber-400">● {t("logs.paused")}</span>
-          )}
-        </span>
+        <span>{searchQuery ? t("logs.displayLogs", { filtered: filteredLogs.length, total: logs.length }) : t("logs.totalLogs", { total: logs.length })}</span>
+        <span>{streaming ? (<span className="text-green-600 dark:text-green-400">● {t("logs.realtimeMonitoring")}</span>) : (<span className="text-amber-600 dark:text-amber-400">● {t("logs.paused")}</span>)}</span>
       </div>
     </div>
   );

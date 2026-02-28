@@ -1,20 +1,71 @@
 /**
- * Nanoboard 类型定义
- * 集中管理前后端通信的数据类型
+ * 类型定义导出
  */
 
-// ============ 配置相关 ============
+// Config 类型
+export type {
+  Config,
+  Provider,
+  Channel,
+  McpServer,
+  ToolsConfig,
+  AgentDefaults,
+  AgentConfig,
+  ChannelsConfig,
+  ProviderAgentConfig,
+  ProviderInfo,
+  ChannelInfo,
+  McpServerWithState,
+  ConfigTemplate,
+  ConfigHistoryVersion,
+  EditingProvider,
+  EditingChannel,
+  EditingMcpServer,
+  ConfirmDialogState,
+  TemplateDialogState,
+} from "./config";
 
-export interface ConfigHistoryVersion {
-  filename: string;
-  timestamp: number;
-  size: number;
-}
+// Workspace 类型
+export type {
+  FsItem,
+  Breadcrumb,
+  FrontmatterData,
+  ChatSession,
+  ChatMessage,
+} from "./workspace";
 
+// Skills 类型
+export type { Skill } from "./skills";
+
+// Dashboard 类型
+export type {
+  Status,
+  SystemInfo,
+  NanobotVersion,
+  LogStatistics,
+  NetworkData,
+  DashboardConfig,
+  DiagnosisCheck,
+  DiagnosisResult,
+} from "./dashboard";
+
+// ClawHub 类型
+export type {
+  ClawHubSearchResponse,
+  ClawHubSkillsResponse,
+  SkillDetailResponse,
+  SkillListItem,
+  SearchResult,
+  ClawHubSearchResult,
+} from "./clawhub";
+
+// Tauri 操作结果类型
 export interface ConfigCheckResult {
   valid: boolean;
-  issue?: 'config_missing' | 'api_key_missing' | 'invalid_json';
+  errors?: string[];
+  warnings?: string[];
   message?: string;
+  issue?: string;
 }
 
 export interface ConfigValidation {
@@ -22,17 +73,14 @@ export interface ConfigValidation {
   errors?: string[];
 }
 
-// ============ 进程相关 ============
-
 export interface ProcessStartResult {
-  status: 'started' | 'already_running' | 'failed';
+  success: boolean;
   message?: string;
-  pid?: number;
-  port?: number;
+  status?: string;
 }
 
 export interface ProcessStopResult {
-  status: 'stopped' | 'not_running' | 'failed';
+  success: boolean;
   message?: string;
 }
 
@@ -40,115 +88,46 @@ export interface ProcessStatus {
   running: boolean;
   pid?: number;
   port?: number;
-  started_at?: number;
-}
-
-export interface SystemInfo {
-  os: string;
-  arch: string;
-  python_version?: string;
-  nanobot_version?: string;
-}
-
-export interface DiagnosticCheck {
-  key: string;
-  name: string;
-  status: 'ok' | 'warning' | 'error';
-  message: string;
-  message_key: string;
-  details?: string;
-  has_issue: boolean;
 }
 
 export interface DiagnosticResult {
-  overall: 'passed' | 'failed';
-  checks: DiagnosticCheck[];
+  overall: "passed" | "failed";
+  checks: any[];
 }
 
 export interface DownloadResult {
-  status: 'success' | 'failed';
-  message: string;
+  success: boolean;
+  message?: string;
+  status?: string;
 }
 
 export interface NanobotPath {
-  found: boolean;
   path?: string;
-  message?: string;
+  exists: boolean;
 }
-
-// ============ 日志相关 ============
 
 export interface LogResponse {
   logs: string[];
   total: number;
-  showing: number;
 }
-
-export interface LogStatistics {
-  total_lines: number;
-  error_count: number;
-  warning_count: number;
-  info_count: number;
-  file_size: number;
-}
-
-// ============ 网络相关 ============
 
 export interface NetworkStats {
-  upload_speed: number;
-  download_speed: number;
-  total_upload: number;
-  total_download: number;
+  upload: number;
+  download: number;
+  timestamp: number;
 }
-
-// ============ 会话/记忆相关 ============
-
-export interface Session {
-  id: string;
-  name: string;
-  modified?: number;
-  size?: number;
-}
-
-// Memory 类型别名，用于记忆管理页面
-export type Memory = Session;
 
 export interface SessionListResult {
-  sessions: Session[];
-  message?: string;
+  sessions: any[];
 }
 
 export interface SessionMemory {
   id: string;
   content: string;
-  last_modified?: number;
 }
 
 export interface WorkspaceFiles {
-  success: boolean;
-  items?: WorkspaceFile[];
-  message?: string;
-}
-
-export interface WorkspaceFile {
-  name: string;
-  path: string;
-  is_dir: boolean;
-  size?: number;
-  modified?: number;
-}
-
-export interface DirectoryTree {
-  name: string;
-  path: string;
-  is_dir: boolean;
-  children?: DirectoryTree[];
-}
-
-export interface FileContent {
-  success: boolean;
-  content?: string;
-  message?: string;
+  files: any[];
 }
 
 export interface OperationResult {
@@ -156,26 +135,13 @@ export interface OperationResult {
   message?: string;
 }
 
-// ============ Skill 相关 ============
-
-export interface Skill {
-  id: string;
-  name: string;
-  title?: string;
-  enabled: boolean;
-  modified?: number;
+export interface SkillListResult {
+  skills: any[];
 }
 
 export interface SkillContent {
-  success: boolean;
-  content?: string;
-  name?: string;
-  id?: string;
-  message?: string;
-}
-
-export interface SkillListResult {
-  skills: Skill[];
+  content: string;
+  success?: boolean;
   message?: string;
 }
 
@@ -186,78 +152,63 @@ export interface ToggleResult {
   message?: string;
 }
 
-// ============ 主题相关 ============
-
-export type Theme = 'light' | 'dark' | 'system';
-
-// ============ 定时任务相关 ============
-
-/** 调度类型 */
-export type ScheduleKind = "cron" | "every" | "at";
-
-/** 调度配置 */
-export interface CronSchedule {
-  kind: ScheduleKind;
-  atMs: number | null;
-  everyMs: number | null;
-  expr: string | null;
-  tz: string | null;
-}
-
-/** 任务负载类型 */
-export type PayloadKind = "agent_turn";
-
-/** 任务负载 */
-export interface CronPayload {
-  kind: PayloadKind;
-  message: string;
-  deliver: boolean;
-  channel: string | null;
-  to: string | null;
-}
-
-/** 任务状态 */
-export interface CronState {
-  nextRunAtMs: number | null;
-  lastRunAtMs: number | null;
-  lastStatus: "success" | "failed" | "running" | null;
-  lastError: string | null;
-}
-
-/** 定时任务完整结构 */
-export interface CronJob {
-  id: string;
-  name: string;
-  enabled: boolean;
-  schedule: CronSchedule;
-  payload: CronPayload;
-  state: CronState;
-  createdAtMs: number;
-  updatedAtMs: number;
-  deleteAfterRun: boolean;
-}
-
-/** 任务列表文件结构 */
-export interface CronJobsFile {
-  version: number;
-  jobs: CronJob[];
-}
+export type Theme = "light" | "dark";
 
 export interface CronListResult {
-  success: boolean;
-  jobs: CronJob[];
+  jobs: any[];
+  success?: boolean;
   message?: string;
 }
 
 export interface CronOperationResult {
   success: boolean;
   message?: string;
+  job?: any;
 }
 
-// ============ 通用响应 ============
-
-export interface ApiResult<T = void> {
-  success: boolean;
-  data?: T;
-  error?: string;
+export interface CronSchedule {
+  kind?: "cron" | "every" | "at";
+  expr?: string;
+  everyMs?: number;
+  atMs?: number;
+  tz?: string;
 }
+
+// Cron Job 类型
+export interface CronJob {
+  id: string;
+  name?: string;
+  schedule: {
+    kind: "cron" | "every" | "at";
+    expr?: string;
+    everyMs?: number;
+    atMs?: number;
+    tz?: string;
+  };
+  payload: {
+    message: string;
+  };
+  enabled: boolean;
+  state?: {
+    nextRunAtMs?: number;
+    lastRunAtMs?: number;
+    lastStatus?: "success" | "failed";
+    lastError?: string;
+  };
+}
+
+// Memory 类型
+export interface Memory {
+  id: string;
+  name: string;
+  content?: string;
+  size?: number;
+  modified?: number;
+  updatedAt?: number;
+}
+
+// Tab 类型
+export type TabType = "files" | "skills" | "memory" | "sessions" | "cron";
+
+// 现有类型 (保持向后兼容 - 避免循环导入)
+// Memory 和 CronJob 类型已在上方定义

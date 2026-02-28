@@ -96,3 +96,6 @@ export const SKILL_SORT_OPTIONS: { value: SkillSortOption; labelKey: string }[] 
   { value: "stars", labelKey: "skills.sortStars" },
   { value: "updated", labelKey: "skills.sortUpdated" },
 ];
+
+// SearchResult 别名 (用于兼容)
+export type SearchResult = ClawHubSearchResult;
