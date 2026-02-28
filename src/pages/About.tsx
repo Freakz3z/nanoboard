@@ -28,7 +28,7 @@ import type { DiagnosticResult } from "@/types";
 // 应用信息
 const APP_INFO = {
   name: "nanoboard",
-  version: "0.2.6",
+  version: "0.3.0",
   description: "一个极轻量化 nanobot Tauri 管理助手",
   descriptionEn: "An Ultra-lightweight nanobot Tauri Management Assistant",
   github: "https://github.com/Freakz3z/nanoboard",
