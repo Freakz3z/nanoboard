@@ -1128,6 +1128,9 @@
     "installTip": "请手动执行以下命令安装此技能",
     "uninstallTip": "请手动执行以下命令卸载此技能",
     "copyFailed": "复制失败",
-    "loadingDetail": "加载技能详情中..."
+    "loadingDetail": "加载技能详情中...",
+    "install": "安装",
+    "uninstall": "卸载",
+    "viewDetails": "查看详情"
   }
 }

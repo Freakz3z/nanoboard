@@ -1129,6 +1129,9 @@
     "installTip": "Please manually execute the following command to install this skill",
     "uninstallTip": "Please manually execute the following command to uninstall this skill",
     "copyFailed": "Copy failed",
-    "loadingDetail": "Loading skill details..."
+    "loadingDetail": "Loading skill details...",
+    "install": "Install",
+    "uninstall": "Uninstall",
+    "viewDetails": "View Details"
   }
 }
