@@ -75,12 +75,14 @@ export default function SkillsMarket() {
 
   const clearSearch = () => { setSearchQuery(""); setSearchResults([]); setSearchMode(false); };
 
-  const viewSkillDetail = async (slug: string) => {
+  const viewSkillDetail = async (skill: ClawHubSearchResult | SkillListItem) => {
+    const slug = (skill as any).slug;
     setLoadingDetail(true);
     try {
       const detail = await clawhubApi.getSkillDetail(slug);
       setSelectedSkill(detail);
-    } catch {
+    } catch (error) {
+      console.error("Failed to load skill detail:", error);
       toast.showError(t("skills.loadDetailFailed"));
     } finally {
       setLoadingDetail(false);
@@ -212,7 +214,7 @@ export default function SkillsMarket() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {searchResults.map((skill) => (
                   <SkillCard key={skill.slug} skill={skill} isInstalled={false} onInstall={handleInstall}
-                    onUninstall={handleUninstall} onViewDetails={viewSkillDetail} />
+                    onUninstall={handleUninstall} onViewDetails={(s) => viewSkillDetail(s)} />
                 ))}
               </div>
             ) : (
@@ -222,7 +224,7 @@ export default function SkillsMarket() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {skills.map((skill) => (
                 <SkillCard key={skill.slug} skill={skill} isInstalled={false} onInstall={handleInstall}
-                  onUninstall={handleUninstall} onViewDetails={viewSkillDetail} />
+                  onUninstall={handleUninstall} onViewDetails={(s) => viewSkillDetail(s)} />
               ))}
             </div>
           ) : (
