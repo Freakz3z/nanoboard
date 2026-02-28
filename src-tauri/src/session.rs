@@ -57,6 +57,32 @@ fn validate_and_canonicalize_path(relative_path: &str, workspace_path: &Path) ->
     Ok(canonical_target)
 }
 
+/// 验证 session_id 或 skill_id 是否安全
+/// 防止路径遍历攻击
+fn validate_identifier(id: &str) -> Result<(), String> {
+    // 拒绝路径遍历字符
+    if id.contains('/') || id.contains('\\') || id == ".." || id.contains("..\\") || id.contains("../") {
+        return Err("无效的 ID 格式：包含非法字符".to_string());
+    }
+    
+    // 拒绝绝对路径
+    if id.starts_with('/') || id.starts_with('\\') {
+        return Err("无效的 ID 格式：不能是绝对路径".to_string());
+    }
+    
+    // 拒绝空 ID
+    if id.trim().is_empty() {
+        return Err("无效的 ID 格式：ID 不能为空".to_string());
+    }
+    
+    // 只允许字母、数字、连字符、下划线、点
+    if !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.') {
+        return Err("ID 只能包含字母、数字、连字符、下划线和点".to_string());
+    }
+    
+    Ok(())
+}
+
 /// 列出所有会话
 #[tauri::command]
 pub async fn list_sessions() -> Result<serde_json::Value, String> {
