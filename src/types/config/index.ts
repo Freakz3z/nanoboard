@@ -45,6 +45,19 @@ export interface ToolsConfig {
   [key: string]: any;
 }
 
+// 路径配置
+export interface PathConfig {
+  nanobotPath?: string;      // ~/.nanobot 目录路径
+  pythonPath?: string;       // Python 解释器路径
+  // 以下路径从 nanobotPath 自动推导，不需要用户配置
+  // workspacePath: ${nanobotPath}/workspace
+  // skillsPath: ${nanobotPath}/workspace/skills
+  // memoryPath: ${nanobotPath}/workspace/memory
+  // sessionsPath: ${nanobotPath}/workspace/sessions
+  // cronPath: ${nanobotPath}/cron
+  // logsPath: ${nanobotPath}/logs
+}
+
 // Agent 默认配置
 export interface AgentDefaults {
   provider: string;
@@ -75,6 +88,7 @@ export interface Config {
   channels?: ChannelsConfig;
   tools?: ToolsConfig;
   agents?: AgentConfig;
+  paths?: PathConfig;
   [key: string]: any;
 }
 

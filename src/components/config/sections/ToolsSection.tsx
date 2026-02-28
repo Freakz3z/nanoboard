@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Wrench, ChevronUp, ChevronDown, Terminal, Globe, Shield } from "lucide-react";
+import { Wrench, ChevronUp, ChevronDown, Terminal, Globe, Shield, Folder, FileCode } from "lucide-react";
 import type { Config } from "@/types/config";
 
 interface ToolsSectionProps {
@@ -44,6 +44,7 @@ export default function ToolsSection({
 
       {expanded && (
         <div className="p-5 pt-0 space-y-6">
+
           {/* Exec 配置 */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-gray-700 dark:text-dark-text-secondary flex items-center gap-2">
