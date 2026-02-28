@@ -179,7 +179,7 @@ nanoboard/
 - [x] Skills management (enable/disable/edit)
 - [x] Memory management (view/edit/delete)
 - [x] Cron jobs management
-- [x] ClawHub Skills Market
+- [x] ClawHub Skills Market (with installed status indicator, one-click install/uninstall)
 - [ ] Auto-update feature
 
 ## Acknowledgments
