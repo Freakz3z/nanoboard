@@ -12,10 +12,12 @@ const CLAWHUB_API_BASE: &str = "https://clawhub.ai";
 pub struct ClawHubSearchResult {
     pub score: f64,
     pub slug: String,
-    pub displayName: String,
+    #[serde(rename = "displayName")]
+    pub display_name: String,
     pub summary: String,
     pub version: String,
-    pub updatedAt: i64,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -76,14 +78,6 @@ pub struct SkillOwner {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SkillDetail {
-    pub skill: SkillInfo,
-    #[serde(rename = "latestVersion")]
-    pub latest_version: SkillVersion,
-    pub owner: SkillOwner,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct SkillInfo {
     pub slug: String,
     #[serde(rename = "displayName")]
@@ -103,21 +97,6 @@ pub struct SkillDetailResponse {
     #[serde(rename = "latestVersion")]
     pub latest_version: SkillVersion,
     pub owner: SkillOwner,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SkillFile {
-    pub path: String,
-    pub size: i64,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SkillVersionDetail {
-    pub version: String,
-    #[serde(rename = "createdAt")]
-    pub created_at: i64,
-    pub changelog: Option<String>,
-    pub files: Vec<SkillFile>,
 }
 
 /// 搜索 ClawHub Skills
