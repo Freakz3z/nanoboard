@@ -81,14 +81,14 @@ export default function SkillsMarket() {
     } finally {
       setLoading(false);
     }
-  }, [sortBy, t, toast]);
+  }, [sortBy]); // 移除 t 和 toast 依赖，避免引用不稳定导致无限循环
 
-  // 初始加载
+  // 初始加载 - 只在组件挂载时和 sortBy 改变时执行
   useEffect(() => {
     if (!searchMode) {
       loadSkills();
     }
-  }, [loadSkills, searchMode]);
+  }, [sortBy, searchMode]); // 直接依赖 sortBy 而不是 loadSkills
 
   // 搜索技能
   const handleSearch = async () => {
@@ -173,19 +173,9 @@ export default function SkillsMarket() {
       <div className="bg-white dark:bg-dark-bg-card border-b border-gray-200 dark:border-dark-border-subtle p-4 transition-colors duration-200">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                <Search className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-dark-text-primary">
-                  {t("skills.title")}
-                </h1>
-                <p className="text-sm text-gray-500 dark:text-dark-text-secondary">
-                  {t("skills.subtitle")}
-                </p>
-              </div>
-            </div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-dark-text-primary">
+              {t("skills.title")}
+            </h1>
             <a
               href="https://clawhub.ai"
               target="_blank"
