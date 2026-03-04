@@ -67,7 +67,7 @@ export default function Workspace() {
   const [isCronSubmitting, setIsCronSubmitting] = useState(false);
   const [editingCronJob, setEditingCronJob] = useState<CronJob | null>(null);
   const [cronForm, setCronForm] = useState({
-    name: "", message: "", scheduleType: "cron" as const,
+    name: "", message: "", scheduleType: "cron" as "cron" | "every" | "at",
     cronMinute: "0", cronHour: "9", cronDom: "*", cronMonth: "*", cronDow: "*",
     everySeconds: "3600", atTime: "", tz: "",
   });
@@ -708,106 +708,282 @@ export default function Workspace() {
         </div>
       )}
 
-      {/* Cron 对话框和确认对话框 - 保持原有逻辑 */}
+      {/* Cron 对话框和确认对话框 */}
       {showCronDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-dark-bg-card rounded-xl shadow-xl max-w-lg w-full p-6 mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-5">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-dark-bg-card rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+            {/* 头部渐变区域 */}
+            <div className={`px-6 py-5 flex items-center justify-between flex-shrink-0 ${
+              editingCronJob
+                ? "bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-b border-amber-100 dark:border-amber-800/30"
+                : "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-blue-100 dark:border-blue-800/30"
+            }`}>
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${editingCronJob ? "bg-amber-50 dark:bg-amber-900/30" : "bg-blue-50 dark:bg-blue-900/30"}`}>
-                  {editingCronJob ? <Pencil className="w-5 h-5 text-amber-600 dark:text-amber-400" /> : <Plus className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+                <div className={`p-2.5 rounded-xl shadow-sm ${editingCronJob ? "bg-amber-100 dark:bg-amber-800/50" : "bg-blue-100 dark:bg-blue-800/50"}`}>
+                  {editingCronJob
+                    ? <Pencil className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    : <CalendarClock className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary">{editingCronJob ? t("workspace.cronEditJob") : t("workspace.cronAddJob")}</h3>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-dark-text-primary">
+                    {editingCronJob ? t("workspace.cronEditJob") : t("workspace.cronAddJob")}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-dark-text-muted mt-0.5">
+                    {editingCronJob ? t("workspace.cronEditJobDesc", "修改定时任务参数") : t("workspace.cronAddJobDesc", "创建一个新的定时自动化任务")}
+                  </p>
+                </div>
               </div>
-              <button onClick={() => { setShowCronDialog(false); resetCronForm(); }} className="p-1.5 hover:bg-gray-100 dark:hover:bg-dark-bg-hover rounded-lg transition-colors">
+              <button
+                onClick={() => { setShowCronDialog(false); resetCronForm(); }}
+                className="p-1.5 hover:bg-white/70 dark:hover:bg-dark-bg-hover rounded-lg transition-colors"
+              >
                 <X className="w-5 h-5 text-gray-500 dark:text-dark-text-muted" />
               </button>
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">{t("workspace.cronJobName")}</label>
-                <input type="text" value={cronForm.name} onChange={(e) => setCronForm({ ...cronForm, name: e.target.value })} placeholder={t("workspace.cronJobNamePlaceholder")}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" autoFocus />
+
+            {/* 内容滚动区域 */}
+            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+              {/* 基本信息 */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-1 h-4 rounded-full bg-blue-500"></div>
+                  <span className="text-xs font-semibold text-gray-500 dark:text-dark-text-muted uppercase tracking-wide">{t("workspace.cronBasicInfo", "基本信息")}</span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1.5">{t("workspace.cronJobName")}</label>
+                  <input
+                    type="text"
+                    value={cronForm.name}
+                    onChange={(e) => setCronForm({ ...cronForm, name: e.target.value })}
+                    placeholder={t("workspace.cronJobNamePlaceholder")}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      {t("workspace.cronMessageLabel")}
+                    </span>
+                  </label>
+                  <textarea
+                    value={cronForm.message}
+                    onChange={(e) => setCronForm({ ...cronForm, message: e.target.value })}
+                    placeholder={t("workspace.cronMessagePlaceholder")}
+                    rows={3}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none transition-all"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">{t("workspace.cronMessageLabel")}</label>
-                <textarea value={cronForm.message} onChange={(e) => setCronForm({ ...cronForm, message: e.target.value })} placeholder={t("workspace.cronMessagePlaceholder")} rows={3}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-2">{t("workspace.cronScheduleType")}</label>
+
+              {/* 分隔线 */}
+              <div className="border-t border-gray-100 dark:border-dark-border-subtle"></div>
+
+              {/* 调度设置 */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-1 h-4 rounded-full bg-indigo-500"></div>
+                  <span className="text-xs font-semibold text-gray-500 dark:text-dark-text-muted uppercase tracking-wide">{t("workspace.cronScheduleType")}</span>
+                </div>
+
+                {/* 调度类型选择 */}
                 <div className="grid grid-cols-3 gap-2">
-                  {["cron", "every", "at"].map((type) => (
-                    <button key={type} onClick={() => setCronForm({ ...cronForm, scheduleType: type as any })}
-                      className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-medium ${cronForm.scheduleType === type ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400" : "border-gray-200 dark:border-dark-border-subtle text-gray-600 dark:text-dark-text-muted hover:border-gray-300"}`}>
-                      {type === "cron" ? <CalendarClock className="w-4 h-4" /> : type === "every" ? <Clock className="w-4 h-4" /> : <Timer className="w-4 h-4" />}
-                      {t(`workspace.cron${type === "cron" ? "" : type === "every" ? "Interval" : "RunOnce"}`)}
+                  {[
+                    { type: "cron", icon: <CalendarClock className="w-4 h-4" />, label: t("workspace.cron"), desc: t("workspace.cronCronDesc") },
+                    { type: "every", icon: <Clock className="w-4 h-4" />, label: t("workspace.cronInterval"), desc: t("workspace.cronIntervalDescShort") },
+                    { type: "at", icon: <Timer className="w-4 h-4" />, label: t("workspace.cronRunOnce"), desc: t("workspace.cronRunOnceDescShort") },
+                  ].map(({ type, icon, label, desc }) => (
+                    <button
+                      key={type}
+                      onClick={() => setCronForm({ ...cronForm, scheduleType: type as any })}
+                      className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                        cronForm.scheduleType === type
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 shadow-sm"
+                          : "border-gray-200 dark:border-dark-border-subtle text-gray-600 dark:text-dark-text-muted hover:border-gray-300 dark:hover:border-dark-border-default hover:bg-gray-50 dark:hover:bg-dark-bg-hover"
+                      }`}
+                    >
+                      {icon}
+                      <span className="text-xs font-semibold">{label}</span>
+                      <span className="text-[10px] opacity-70 font-normal">{desc}</span>
                     </button>
                   ))}
                 </div>
-              </div>
-              {cronForm.scheduleType === "cron" ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-2">{t("workspace.cronExpression")}</label>
-                  <div className="grid grid-cols-5 gap-2">
-                    {[{ key: "cronMinute", label: t("workspace.cronFieldMinute"), placeholder: "0" }, { key: "cronHour", label: t("workspace.cronFieldHour"), placeholder: "9" },
-                      { key: "cronDom", label: t("workspace.cronFieldDom"), placeholder: "*" }, { key: "cronMonth", label: t("workspace.cronFieldMonth"), placeholder: "*" },
-                      { key: "cronDow", label: t("workspace.cronFieldDow"), placeholder: "*" }].map((field) => (
-                      <div key={field.key} className="flex flex-col">
-                        <span className="text-xs font-medium text-gray-500 dark:text-dark-text-muted mb-1 text-center">{field.label}</span>
-                        <input type="text" value={cronForm[field.key as keyof typeof cronForm]} onChange={(e) => setCronForm({ ...cronForm, [field.key]: e.target.value })}
-                          placeholder={field.placeholder} className="w-full px-2 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono text-center" />
+
+                {/* Cron 表达式 */}
+                {cronForm.scheduleType === "cron" && (
+                  <div className="space-y-3">
+                    {/* 快捷预设 */}
+                    <div>
+                      <span className="text-xs text-gray-500 dark:text-dark-text-muted mb-2 block">{t("workspace.cronPresets", "快捷预设")}</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { label: t("workspace.cronPresetEveryMin", "每分钟"), values: { cronMinute: "*", cronHour: "*", cronDom: "*", cronMonth: "*", cronDow: "*" } },
+                          { label: t("workspace.cronPresetEvery5Min", "每5分钟"), values: { cronMinute: "*/5", cronHour: "*", cronDom: "*", cronMonth: "*", cronDow: "*" } },
+                          { label: t("workspace.cronPresetEveryHour", "每小时"), values: { cronMinute: "0", cronHour: "*", cronDom: "*", cronMonth: "*", cronDow: "*" } },
+                          { label: t("workspace.cronPresetDaily9", "每天9:00"), values: { cronMinute: "0", cronHour: "9", cronDom: "*", cronMonth: "*", cronDow: "*" } },
+                          { label: t("workspace.cronPresetWeekday9", "工作日9:00"), values: { cronMinute: "0", cronHour: "9", cronDom: "*", cronMonth: "*", cronDow: "1-5" } },
+                        ].map((preset) => {
+                          const presetExpr = `${preset.values.cronMinute} ${preset.values.cronHour} ${preset.values.cronDom} ${preset.values.cronMonth} ${preset.values.cronDow}`;
+                          const currentExpr = getCronExpression(cronForm);
+                          const isActive = currentExpr === presetExpr;
+                          return (
+                            <button
+                              key={preset.label}
+                              onClick={() => setCronForm({ ...cronForm, ...preset.values })}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all border ${
+                                isActive
+                                  ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-600"
+                                  : "bg-gray-100 dark:bg-dark-bg-hover text-gray-600 dark:text-dark-text-muted border-gray-200 dark:border-dark-border-subtle hover:bg-gray-200 dark:hover:bg-dark-bg-active"
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          );
+                        })}
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Cron 字段输入 */}
+                    <div className="bg-gray-50 dark:bg-dark-bg-sidebar rounded-xl p-3 border border-gray-200 dark:border-dark-border-subtle">
+                      <div className="grid grid-cols-5 gap-2">
+                        {[
+                          { key: "cronMinute", label: t("workspace.cronFieldMinute"), placeholder: "0" },
+                          { key: "cronHour", label: t("workspace.cronFieldHour"), placeholder: "9" },
+                          { key: "cronDom", label: t("workspace.cronFieldDom"), placeholder: "*" },
+                          { key: "cronMonth", label: t("workspace.cronFieldMonth"), placeholder: "*" },
+                          { key: "cronDow", label: t("workspace.cronFieldDow"), placeholder: "*" },
+                        ].map((field) => (
+                          <div key={field.key} className="flex flex-col">
+                            <span className="text-[10px] font-medium text-gray-400 dark:text-dark-text-muted mb-1 text-center">{field.label}</span>
+                            <input
+                              type="text"
+                              value={cronForm[field.key as keyof typeof cronForm]}
+                              onChange={(e) => setCronForm({ ...cronForm, [field.key]: e.target.value })}
+                              placeholder={field.placeholder}
+                              className="w-full px-2 py-2 bg-white dark:bg-dark-bg-card border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono text-center transition-all"
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 预览 */}
+                      <div className="mt-3 flex items-center gap-2.5 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                        <CalendarClock className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-blue-700 dark:text-blue-300 font-medium truncate">{describeCron(getCronExpression(cronForm), t)}</p>
+                          <code className="text-[10px] text-blue-400 dark:text-blue-500 font-mono">{getCronExpression(cronForm)}</code>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 rounded-lg">
-                    <div className="flex items-center gap-2"><CalendarClock className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
-                      <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">{describeCron(getCronExpression(cronForm), t)}</span></div>
-                    <p className="text-xs text-blue-500 dark:text-blue-400/70 mt-1 ml-6 font-mono">{getCronExpression(cronForm)}</p>
+                )}
+
+                {/* 固定间隔 */}
+                {cronForm.scheduleType === "every" && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={cronForm.everySeconds}
+                        onChange={(e) => setCronForm({ ...cronForm, everySeconds: e.target.value })}
+                        placeholder="3600"
+                        min={1}
+                        className="flex-1 px-3.5 py-2.5 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
+                      />
+                      <span className="text-sm text-gray-500 dark:text-dark-text-muted whitespace-nowrap">{t("workspace.cronSeconds", "秒")}</span>
+                    </div>
+                    {/* 间隔快捷 */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { label: "1分钟", val: "60" }, { label: "5分钟", val: "300" },
+                        { label: "30分钟", val: "1800" }, { label: "1小时", val: "3600" },
+                        { label: "6小时", val: "21600" }, { label: "1天", val: "86400" },
+                      ].map((p) => (
+                        <button
+                          key={p.val}
+                          onClick={() => setCronForm({ ...cronForm, everySeconds: p.val })}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all border ${
+                            cronForm.everySeconds === p.val
+                              ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-600"
+                              : "bg-gray-100 dark:bg-dark-bg-hover text-gray-600 dark:text-dark-text-muted border-gray-200 dark:border-dark-border-subtle hover:bg-gray-200 dark:hover:bg-dark-bg-active"
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/30">
+                      <Clock className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                      <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">{describeIntervalMs(parseInt(cronForm.everySeconds || "0") * 1000, t)}</span>
+                    </div>
                   </div>
-                </div>
-              ) : cronForm.scheduleType === "every" ? (
+                )}
+
+                {/* 定时执行 */}
+                {cronForm.scheduleType === "at" && (
+                  <div className="space-y-2">
+                    <input
+                      type="datetime-local"
+                      value={cronForm.atTime}
+                      onChange={(e) => setCronForm({ ...cronForm, atTime: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
+                    />
+                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/30">
+                      <Timer className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                      <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                        {cronForm.atTime ? t("workspace.cronRunOnceAt", { time: cronForm.atTime.replace("T", " ") }) : t("workspace.cronSelectTime")}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 时区 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">{t("workspace.cronIntervalSeconds")}</label>
-                  <input type="number" value={cronForm.everySeconds} onChange={(e) => setCronForm({ ...cronForm, everySeconds: e.target.value })} placeholder="3600" min={1}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-                  <div className="mt-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 rounded-lg">
-                    <div className="flex items-center gap-2"><Clock className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
-                      <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">{describeIntervalMs(parseInt(cronForm.everySeconds) * 1000, t)}</span></div>
-                  </div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1.5">{t("workspace.cronTimezone")}</label>
+                  <select
+                    value={cronForm.tz}
+                    onChange={(e) => setCronForm({ ...cronForm, tz: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
+                  >
+                    <option value="">{t("workspace.cronTimezoneDefault")}</option>
+                    <option value="Asia/Shanghai">Asia/Shanghai（北京时间）</option>
+                    <option value="Asia/Hong_Kong">Asia/Hong_Kong（香港）</option>
+                    <option value="Asia/Tokyo">Asia/Tokyo（东京）</option>
+                    <option value="America/New_York">America/New_York（纽约）</option>
+                    <option value="Europe/London">Europe/London（伦敦）</option>
+                    <option value="UTC">UTC（协调世界时）</option>
+                  </select>
                 </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">{t("workspace.cronAtTime")}</label>
-                  <input type="datetime-local" value={cronForm.atTime} onChange={(e) => setCronForm({ ...cronForm, atTime: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-                  <div className="mt-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 rounded-lg">
-                    <div className="flex items-center gap-2"><Timer className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
-                      <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">{cronForm.atTime ? t("workspace.cronRunOnceAt", { time: cronForm.atTime.replace("T", " ") }) : t("workspace.cronSelectTime")}</span></div>
-                  </div>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">{t("workspace.cronTimezone")}</label>
-                <select value={cronForm.tz} onChange={(e) => setCronForm({ ...cronForm, tz: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg-sidebar border border-gray-200 dark:border-dark-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                  <option value="">{t("workspace.cronTimezoneDefault")}</option>
-                  <option value="Asia/Shanghai">Asia/Shanghai (北京时间)</option>
-                  <option value="Asia/Hong_Kong">Asia/Hong_Kong (香港)</option>
-                  <option value="Asia/Tokyo">Asia/Tokyo (东京)</option>
-                  <option value="America/New_York">America/New_York (纽约)</option>
-                  <option value="Europe/London">Europe/London (伦敦)</option>
-                  <option value="UTC">UTC (协调世界时)</option>
-                </select>
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => { setShowCronDialog(false); resetCronForm(); }}
-                className="px-4 py-2 bg-gray-100 dark:bg-dark-bg-hover hover:bg-gray-200 dark:hover:bg-dark-bg-active text-gray-700 dark:text-dark-text-primary rounded-lg transition-colors text-sm font-medium">{t("workspace.cronCancel")}</button>
-              <button onClick={handleAddCronJob} disabled={isCronSubmitting}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors text-sm font-medium">
-                {isCronSubmitting ? (editingCronJob ? t("workspace.cronSaving") : t("workspace.cronAdding")) : (editingCronJob ? t("workspace.cronSave") : t("workspace.cronConfirm"))}
-              </button>
+
+            {/* 底部操作栏 */}
+            <div className="px-6 py-4 border-t border-gray-100 dark:border-dark-border-subtle bg-gray-50/50 dark:bg-dark-bg-sidebar/30 flex-shrink-0 flex items-center justify-between">
+              <span className="text-xs text-gray-400 dark:text-dark-text-muted">
+                {cronForm.name ? `"${cronForm.name}"` : t("workspace.cronUnnamed", "未命名任务")}
+              </span>
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => { setShowCronDialog(false); resetCronForm(); }}
+                  className="px-4 py-2 bg-white dark:bg-dark-bg-hover hover:bg-gray-100 dark:hover:bg-dark-bg-active border border-gray-200 dark:border-dark-border-subtle text-gray-700 dark:text-dark-text-primary rounded-xl transition-all text-sm font-medium shadow-sm"
+                >
+                  {t("workspace.cronCancel")}
+                </button>
+                <button
+                  onClick={handleAddCronJob}
+                  disabled={isCronSubmitting}
+                  className={`px-5 py-2 disabled:opacity-50 text-white rounded-xl transition-all text-sm font-medium shadow-sm ${
+                    editingCronJob
+                      ? "bg-amber-500 hover:bg-amber-600"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                >
+                  {isCronSubmitting
+                    ? (editingCronJob ? t("workspace.cronSaving") : t("workspace.cronAdding"))
+                    : (editingCronJob ? t("workspace.cronSave") : t("workspace.cronConfirm"))}
+                </button>
+              </div>
             </div>
           </div>
         </div>

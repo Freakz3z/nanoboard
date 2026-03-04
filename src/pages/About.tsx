@@ -14,7 +14,6 @@ import {
   AlertCircle,
   XCircle,
   Sparkles,
-  Settings,
   Save,
   RefreshCw,
   Folder,
@@ -91,11 +90,18 @@ export default function About() {
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [customPaths, setCustomPaths] = useState<CustomPaths>(loadCustomPaths);
   const [pathsSaved, setPathsSaved] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     loadSystemInfo();
     checkForUpdates();
+    // 应用启动时将 localStorage 中的自定义路径同步到后端，确保生效
+    const saved = loadCustomPaths();
+    if (saved.pythonPath || saved.nanobotPath) {
+      processApi.setCustomPaths(
+        saved.pythonPath || undefined,
+        saved.nanobotPath || undefined
+      ).catch(console.error);
+    }
   }, []);
 
   // 保存自定义路径
@@ -107,7 +113,6 @@ export default function About() {
       );
       saveCustomPaths(customPaths);
       setPathsSaved(true);
-      setIsEditing(false);
       setTimeout(() => setPathsSaved(false), 2000);
       await loadSystemInfo();
     } catch (error) {
@@ -127,6 +132,8 @@ export default function About() {
       console.error("Failed to reset custom paths:", error);
     }
   }
+
+  const hasCustomPaths = !!(customPaths.pythonPath || customPaths.nanobotPath);
 
   async function checkForUpdates() {
     try {
@@ -419,68 +426,15 @@ export default function About() {
 
             {/* 路径信息区域 */}
             <div className="space-y-6">
-              {/* 路径信息标题栏 */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl">
-                    <Settings className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text-primary">
-                      {t("about.paths")}
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-dark-text-muted">
-                      {t("about.pathsDesc")}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      handleResetPaths();
-                      setIsEditing(false);
-                    }}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text-primary hover:bg-gray-100 dark:hover:bg-dark-bg-hover rounded-lg transition-colors"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    {t("about.autoDetect")}
-                  </button>
-                  {!isEditing ? (
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-dark-bg-sidebar hover:bg-gray-200 dark:hover:bg-dark-bg-hover text-gray-700 dark:text-dark-text-primary text-sm font-medium rounded-lg transition-colors"
-                    >
-                      <Settings className="w-4 h-4" />
-                      {t("about.editPaths")}
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setIsEditing(false);
-                          setCustomPaths({ pythonPath: "", nanobotPath: "" });
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text-primary text-sm font-medium rounded-lg transition-colors"
-                      >
-                        {t("about.cancel")}
-                      </button>
-                      <button
-                        onClick={handleSavePaths}
-                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-md ${
-                          pathsSaved
-                            ? "bg-green-600 text-white"
-                            : "bg-blue-600 hover:bg-blue-700 text-white"
-                        }`}
-                      >
-                        <Save className="w-4 h-4" />
-                        {pathsSaved ? t("about.saved") : t("about.savePaths")}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
               {/* 固定路径列表 */}
+              <div className="flex items-center gap-3 mb-1">
+                <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
+                  <Folder className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-dark-text-secondary">
+                  {t("about.paths")}
+                </h3>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {pathItems.map((item, index) => (
                   <div
@@ -509,62 +463,142 @@ export default function About() {
                 ))}
               </div>
 
-              {/* 自定义路径配置 */}
-              {isEditing && (
-                <div className="mt-6 p-6 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl border border-indigo-200 dark:border-indigo-500/30">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Terminal className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                    <h4 className="text-sm font-semibold text-indigo-900 dark:text-indigo-300">
-                      {t("about.customPathsConfig")}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-indigo-700 dark:text-indigo-400 mb-4">
-                    {t("about.customPathsDesc")}
-                  </p>
-                  <div className="space-y-4">
-                    {/* Python 路径 */}
-                    <div>
-                      <label className="block text-sm font-medium text-indigo-900 dark:text-indigo-300 mb-2">
-                        {t("about.pythonPath")}
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="text"
-                          value={customPaths.pythonPath}
-                          onChange={(e) => setCustomPaths({ ...customPaths, pythonPath: e.target.value })}
-                          placeholder={systemInfo?.pythonPath || t("about.pythonPathPlaceholder")}
-                          className="flex-1 px-4 py-2.5 bg-white dark:bg-dark-bg-card border border-indigo-200 dark:border-indigo-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted font-mono"
-                        />
-                        {systemInfo?.pythonPath && !customPaths.pythonPath && (
-                          <span className="text-xs text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
-                            {t("about.detected")}: {systemInfo.pythonPath}
-                          </span>
-                        )}
-                      </div>
+              {/* 自定义路径配置 - 始终显示 */}
+              <div className={`p-5 rounded-2xl border-2 transition-all ${
+                hasCustomPaths
+                  ? "bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border-indigo-400 dark:border-indigo-500/60 shadow-md"
+                  : "bg-gray-50 dark:bg-dark-bg-sidebar border-dashed border-gray-300 dark:border-dark-border-default"
+              }`}>
+                {/* 区域标题 */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`p-2 rounded-lg ${
+                      hasCustomPaths ? "bg-indigo-100 dark:bg-indigo-800/50" : "bg-gray-200 dark:bg-dark-bg-hover"
+                    }`}>
+                      <Terminal className={`w-4 h-4 ${
+                        hasCustomPaths ? "text-indigo-600 dark:text-indigo-400" : "text-gray-500 dark:text-dark-text-muted"
+                      }`} />
                     </div>
-                    {/* Nanobot 路径 */}
                     <div>
-                      <label className="block text-sm font-medium text-indigo-900 dark:text-indigo-300 mb-2">
-                        {t("about.nanobotPath")}
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="text"
-                          value={customPaths.nanobotPath}
-                          onChange={(e) => setCustomPaths({ ...customPaths, nanobotPath: e.target.value })}
-                          placeholder={systemInfo?.nanobotPath || t("about.nanobotPathPlaceholder")}
-                          className="flex-1 px-4 py-2.5 bg-white dark:bg-dark-bg-card border border-indigo-200 dark:border-indigo-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm text-gray-900 dark:text-dark-text-primary placeholder-gray-400 dark:placeholder-dark-text-muted font-mono"
-                        />
-                        {systemInfo?.nanobotPath && !customPaths.nanobotPath && (
-                          <span className="text-xs text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
-                            {t("about.detected")}: {systemInfo.nanobotPath}
-                          </span>
-                        )}
-                      </div>
+                      <h4 className={`text-sm font-semibold ${
+                        hasCustomPaths ? "text-indigo-900 dark:text-indigo-300" : "text-gray-700 dark:text-dark-text-secondary"
+                      }`}>
+                        {t("about.customPathsConfig")}
+                      </h4>
+                      {hasCustomPaths && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 font-medium mt-0.5">
+                          <CheckCircle className="w-3 h-3" />
+                          {t("about.customPathsActive", "已启用自定义路径")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {hasCustomPaths && (
+                      <button
+                        onClick={handleResetPaths}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 dark:text-dark-text-muted hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        {t("about.autoDetect")}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <p className={`text-xs mb-4 ${
+                  hasCustomPaths ? "text-indigo-700 dark:text-indigo-400" : "text-gray-500 dark:text-dark-text-muted"
+                }`}>
+                  {t("about.customPathsDesc")}
+                </p>
+
+                <div className="space-y-4">
+                  {/* Python 路径 */}
+                  <div>
+                    <label className={`flex items-center gap-1.5 text-sm font-semibold mb-2 ${
+                      hasCustomPaths && customPaths.pythonPath ? "text-indigo-800 dark:text-indigo-300" : "text-gray-600 dark:text-dark-text-secondary"
+                    }`}>
+                      <Terminal className="w-3.5 h-3.5" />
+                      {t("about.pythonPath")}
+                      {customPaths.pythonPath && (
+                        <span className="ml-auto text-[10px] px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded font-medium">
+                          {t("about.custom", "自定义")}
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={customPaths.pythonPath}
+                        onChange={(e) => setCustomPaths({ ...customPaths, pythonPath: e.target.value })}
+                        placeholder={systemInfo?.pythonPath || t("about.pythonPathPlaceholder")}
+                        className={`w-full px-4 py-3 rounded-xl border text-sm font-mono transition-all focus:outline-none focus:ring-2 ${
+                          customPaths.pythonPath
+                            ? "bg-white dark:bg-dark-bg-card border-indigo-300 dark:border-indigo-500/50 text-gray-900 dark:text-dark-text-primary focus:ring-indigo-500 shadow-sm"
+                            : "bg-white dark:bg-dark-bg-card border-gray-200 dark:border-dark-border-subtle text-gray-900 dark:text-dark-text-primary focus:ring-blue-500 placeholder-gray-400 dark:placeholder-dark-text-muted"
+                        }`}
+                      />
+                      {systemInfo?.pythonPath && !customPaths.pythonPath && (
+                        <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-400 dark:text-dark-text-muted">
+                          <CheckCircle className="w-3 h-3 text-green-500" />
+                          {t("about.detected")}: <code className="font-mono ml-0.5">{systemInfo.pythonPath}</code>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Nanobot 路径 */}
+                  <div>
+                    <label className={`flex items-center gap-1.5 text-sm font-semibold mb-2 ${
+                      hasCustomPaths && customPaths.nanobotPath ? "text-indigo-800 dark:text-indigo-300" : "text-gray-600 dark:text-dark-text-secondary"
+                    }`}>
+                      <Bot className="w-3.5 h-3.5" />
+                      {t("about.nanobotPath")}
+                      {customPaths.nanobotPath && (
+                        <span className="ml-auto text-[10px] px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded font-medium">
+                          {t("about.custom", "自定义")}
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={customPaths.nanobotPath}
+                        onChange={(e) => setCustomPaths({ ...customPaths, nanobotPath: e.target.value })}
+                        placeholder={systemInfo?.nanobotPath || t("about.nanobotPathPlaceholder")}
+                        className={`w-full px-4 py-3 rounded-xl border text-sm font-mono transition-all focus:outline-none focus:ring-2 ${
+                          customPaths.nanobotPath
+                            ? "bg-white dark:bg-dark-bg-card border-indigo-300 dark:border-indigo-500/50 text-gray-900 dark:text-dark-text-primary focus:ring-indigo-500 shadow-sm"
+                            : "bg-white dark:bg-dark-bg-card border-gray-200 dark:border-dark-border-subtle text-gray-900 dark:text-dark-text-primary focus:ring-blue-500 placeholder-gray-400 dark:placeholder-dark-text-muted"
+                        }`}
+                      />
+                      {systemInfo?.nanobotPath && !customPaths.nanobotPath && (
+                        <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-400 dark:text-dark-text-muted">
+                          <CheckCircle className="w-3 h-3 text-green-500" />
+                          {t("about.detected")}: <code className="font-mono ml-0.5">{systemInfo.nanobotPath}</code>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
-              )}
+
+                {/* 保存按钮 */}
+                <div className="mt-5 flex items-center justify-end gap-3">
+                  <button
+                    onClick={handleSavePaths}
+                    className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl transition-all shadow-md ${
+                      pathsSaved
+                        ? "bg-green-500 hover:bg-green-600 text-white"
+                        : hasCustomPaths
+                          ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                          : "bg-blue-600 hover:bg-blue-700 text-white"
+                    }`}
+                  >
+                    <Save className="w-4 h-4" />
+                    {pathsSaved ? t("about.saved") : t("about.savePaths")}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
