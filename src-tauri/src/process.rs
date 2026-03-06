@@ -1270,9 +1270,11 @@ pub async fn check_oauth_token(provider: String) -> Result<serde_json::Value, St
             // 尝试读取并验证 token 文件
             if let Ok(content) = std::fs::read_to_string(&token_path) {
                 if let Ok(token_data) = serde_json::from_str::<serde_json::Value>(&content) {
-                    // 检查是否有 access token（支持 "access" 和 "token" 两种字段名）
+                    // 检查是否有 access token（支持多种字段名）
                     let has_access = token_data.get("access")
                         .or_else(|| token_data.get("token"))
+                        .or_else(|| token_data.get("access_token"))
+                        .or_else(|| token_data.get("id_token"))
                         .and_then(|v| v.as_str())
                         .map(|s| !s.is_empty())
                         .unwrap_or(false);
@@ -1350,59 +1352,75 @@ fn get_oauth_token_paths(home_dir: &std::path::Path, provider: &str) -> Vec<std:
     // macOS: ~/Library/Application Support/oauth-cli-kit/auth/
     #[cfg(target_os = "macos")]
     {
-        let macos_path = home_dir
+        let auth_dir = home_dir
             .join("Library")
             .join("Application Support")
             .join("oauth-cli-kit")
-            .join("auth")
-            .join(format!("{}_oauth.json", provider_filename));
-        paths.push(macos_path);
-
-        // 也检查默认的 oauth.json
-        let default_path = home_dir
-            .join("Library")
-            .join("Application Support")
-            .join("oauth-cli-kit")
-            .join("auth")
-            .join("oauth.json");
-        paths.push(default_path);
+            .join("auth");
+        for fname in &[
+            format!("{}_oauth.json", provider_filename),
+            format!("{}.json", provider_filename),
+            format!("{}_oauth.json", provider),
+            format!("{}.json", provider),
+            "oauth.json".to_string(),
+        ] {
+            paths.push(auth_dir.join(fname));
+        }
     }
 
     // Linux: ~/.local/share/oauth-cli-kit/auth/
     #[cfg(target_os = "linux")]
     {
-        let linux_path = home_dir
+        let auth_dir = home_dir
             .join(".local")
             .join("share")
             .join("oauth-cli-kit")
-            .join("auth")
-            .join(format!("{}_oauth.json", provider_filename));
-        paths.push(linux_path);
-
-        let default_path = home_dir
-            .join(".local")
-            .join("share")
-            .join("oauth-cli-kit")
-            .join("auth")
-            .join("oauth.json");
-        paths.push(default_path);
+            .join("auth");
+        for fname in &[
+            format!("{}_oauth.json", provider_filename),
+            format!("{}.json", provider_filename),
+            format!("{}_oauth.json", provider),
+            format!("{}.json", provider),
+            "oauth.json".to_string(),
+        ] {
+            paths.push(auth_dir.join(fname));
+        }
     }
 
-    // Windows: %APPDATA%/oauth-cli-kit/auth/
+    // Windows: 检查多种可能路径（oauth-cli-kit 依赖 platformdirs，实际使用 LOCALAPPDATA）
     #[cfg(target_os = "windows")]
     {
-        if let Ok(appdata) = std::env::var("APPDATA") {
-            let win_path = std::path::PathBuf::from(&appdata)
-                .join("oauth-cli-kit")
-                .join("auth")
-                .join(format!("{}_oauth.json", provider_filename));
-            paths.push(win_path);
+        // 文件名候选列表（含/不含 _oauth 后缀，以及直接用 provider 原名）
+        let filename_candidates = [
+            format!("{}_oauth.json", provider_filename),
+            format!("{}.json", provider_filename),
+            format!("{}_oauth.json", provider),
+            format!("{}.json", provider),
+            "oauth.json".to_string(),
+        ];
 
-            let default_path = std::path::PathBuf::from(&appdata)
-                .join("oauth-cli-kit")
-                .join("auth")
-                .join("oauth.json");
-            paths.push(default_path);
+        // platformdirs 在 Windows 上的典型路径：
+        // user_data_dir("oauth-cli-kit") -> %LOCALAPPDATA%\oauth-cli-kit\oauth-cli-kit
+        // user_cache_dir / user_config_dir 等同样会落在 LOCALAPPDATA
+        let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
+        let appdata = std::env::var("APPDATA").unwrap_or_default();
+
+        let base_dirs = [
+            // platformdirs user_data_dir (应用名重复是 platformdirs 的行为)
+            std::path::PathBuf::from(&localappdata).join("oauth-cli-kit").join("oauth-cli-kit"),
+            // 不重复应用名
+            std::path::PathBuf::from(&localappdata).join("oauth-cli-kit"),
+            // APPDATA (Roaming) 变体
+            std::path::PathBuf::from(&appdata).join("oauth-cli-kit").join("oauth-cli-kit"),
+            std::path::PathBuf::from(&appdata).join("oauth-cli-kit"),
+        ];
+
+        for base in &base_dirs {
+            for fname in &filename_candidates {
+                paths.push(base.join("auth").join(fname));
+                // 有些版本不建 auth 子目录，直接放在根
+                paths.push(base.join(fname));
+            }
         }
     }
 
@@ -1442,28 +1460,71 @@ pub async fn provider_login(provider: String) -> Result<serde_json::Value, Strin
     let login_command = format!("{} provider login {}", nanobot_cmd, provider);
     log::info!("执行 OAuth 登录: {}", login_command);
 
-    // 在 macOS 上使用 Terminal.app 打开终端
+    // 在 macOS 上使用 .command 文件 + open 命令打开终端（无需 Automation 权限）
     #[cfg(target_os = "macos")]
     {
-        let script = format!(
-            r#"tell application "Terminal"
-                do script "{}"
-                activate
-            end tell"#,
+        use std::os::unix::fs::PermissionsExt;
+
+        // 创建临时 .command 文件（macOS 特定的可执行脚本，Terminal.app 会自动运行）
+        let tmp_script = format!("/tmp/nanobot_oauth_{}.command", std::process::id());
+        let script_content = format!(
+            "#!/bin/bash\nexport PATH=\"{}:$PATH\"\n{}\necho ''\nread -rp '✅ 登录完成后按回车键关闭此窗口...' _\n",
+            std::env::var("PATH").unwrap_or_default(),
             login_command
         );
-        match Command::new("osascript")
-            .args(["-e", &script])
-            .spawn()
-        {
+
+        if let Err(e) = std::fs::write(&tmp_script, &script_content) {
+            return Ok(json!({
+                "success": false,
+                "message": format!("写入登录脚本失败: {}", e)
+            }));
+        }
+
+        // 设置可执行权限
+        if let Err(e) = std::fs::set_permissions(
+            &tmp_script,
+            std::fs::Permissions::from_mode(0o755),
+        ) {
+            return Ok(json!({
+                "success": false,
+                "message": format!("设置脚本权限失败: {}", e)
+            }));
+        }
+
+        // 使用 open 打开 .command 文件（macOS 自动用 Terminal.app 运行，无需 Automation 权限）
+        match Command::new("open").arg(&tmp_script).spawn() {
             Ok(_) => Ok(json!({
                 "success": true,
-                "message": "已在终端中打开登录流程，请在终端中完成授权"
+                "message": "已在终端中打开登录流程，请在终端中完成授权后返回"
             })),
-            Err(e) => Ok(json!({
-                "success": false,
-                "message": format!("打开终端失败: {}", e)
-            })),
+            Err(_) => {
+                // 降级：尝试 osascript 方式
+                let script = format!(
+                    r#"tell application "Terminal"
+                        do script "{}"
+                        activate
+                    end tell"#,
+                    login_command
+                );
+                match Command::new("osascript").args(["-e", &script]).output() {
+                    Ok(output) if output.status.success() => Ok(json!({
+                        "success": true,
+                        "message": "已在终端中打开登录流程，请在终端中完成授权"
+                    })),
+                    Ok(output) => Ok(json!({
+                        "success": false,
+                        "message": format!(
+                            "打开终端失败，请手动运行: {}\n错误: {}",
+                            login_command,
+                            String::from_utf8_lossy(&output.stderr)
+                        )
+                    })),
+                    Err(e) => Ok(json!({
+                        "success": false,
+                        "message": format!("打开终端失败: {}\n请手动运行: {}", e, login_command)
+                    })),
+                }
+            }
         }
     }
 
